@@ -113,6 +113,7 @@ func (rt *runtime) root() *cobra.Command {
 
 	cmd.AddCommand(rt.statusCmd())
 	cmd.AddCommand(rt.readyCmd())
+	cmd.AddCommand(rt.nextCmd())
 	cmd.AddCommand(rt.showCmd())
 	cmd.AddCommand(rt.listCmd())
 	cmd.AddCommand(rt.searchCmd())

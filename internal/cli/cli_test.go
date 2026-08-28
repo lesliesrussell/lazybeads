@@ -143,3 +143,46 @@ func TestVersionPrintsProductVersion(t *testing.T) {
 		t.Errorf("version = %q", out)
 	}
 }
+
+func TestNextJSONExplainsTheRecommendation(t *testing.T) {
+	out, _, code := testCLI(t, fixtureCLI(t), "next", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d, stdout=%s", code, out)
+	}
+	var env map[string]any
+	if err := json.Unmarshal([]byte(out), &env); err != nil {
+		t.Fatalf("next --json is not JSON: %v\n%s", err, out)
+	}
+	if env["command"] != "next" {
+		t.Errorf("command = %v", env["command"])
+	}
+	data, _ := env["data"].(map[string]any)
+	rec, _ := data["recommendation"].(map[string]any)
+	issue, _ := rec["issue"].(map[string]any)
+	if issue["id"] != "lb-1" {
+		t.Errorf("recommended %v, want lb-1", issue["id"])
+	}
+	factors, _ := rec["factors"].([]any)
+	if len(factors) == 0 {
+		t.Error("JSON recommendation must include factors")
+	}
+}
+
+func TestNextHumanNamesTheTaskAndReason(t *testing.T) {
+	out, _, code := testCLI(t, fixtureCLI(t), "next")
+	if code != 0 {
+		t.Fatalf("exit %d, stdout=%s", code, out)
+	}
+	for _, want := range []string{"Recommended next task", "lb-1", "Add typed bd adapter", "Reason:", "lb claim lb-1"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("next human missing %q in:\n%s", want, out)
+		}
+	}
+}
+
+func TestNextUnknownStrategyExitsUsage(t *testing.T) {
+	_, errOut, code := testCLI(t, fixtureCLI(t), "next", "--strategy", "magic")
+	if code != domain.ExitUsage {
+		t.Fatalf("exit %d, want %d; stderr=%s", code, domain.ExitUsage, errOut)
+	}
+}

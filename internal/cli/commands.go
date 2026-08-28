@@ -89,6 +89,41 @@ func (rt *runtime) readyCmd() *cobra.Command {
 	return cmd
 }
 
+// lb-rd7
+func (rt *runtime) nextCmd() *cobra.Command {
+	var (
+		strategy string
+		limit    int
+		parent   string
+	)
+	cmd := &cobra.Command{
+		Use:   "next",
+		Short: "Recommend the highest-leverage ready task and explain why",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx, cancel := rt.ctx(cmd)
+			defer cancel()
+			result, err := rt.svc.Next(ctx, app.NextRequest{
+				Strategy: strategy,
+				Limit:    limit,
+				Parent:   parent,
+			})
+			if err != nil {
+				return err
+			}
+			if rt.format != output.FormatHuman {
+				return rt.emit("next", result, nil)
+			}
+			renderNext(rt.out, result, app.Now(), rt.verbose)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&strategy, "strategy", "", "ranking strategy: priority, leverage, age, balanced, random")
+	cmd.Flags().IntVar(&limit, "limit", 0, "how many ranked tasks to show (default 1)")
+	cmd.Flags().StringVar(&parent, "parent", "", "restrict recommendations to this epic or parent")
+	return cmd
+}
+
 func (rt *runtime) showCmd() *cobra.Command {
 	var events, raw bool
 	cmd := &cobra.Command{

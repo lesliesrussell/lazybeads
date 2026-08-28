@@ -24,6 +24,15 @@ func (rt *runtime) emit(command string, data any, warnings []string) error {
 			return rt.out.EmitJSONL(output.IssuesAsAny(v.Issues))
 		case *app.SearchResult:
 			return rt.out.EmitJSONL(output.IssuesAsAny(v.Issues))
+		case *app.NextResult:
+			items := []any{}
+			if v.Recommendation != nil {
+				items = append(items, v.Recommendation)
+			}
+			for _, alt := range v.Alternatives {
+				items = append(items, alt)
+			}
+			return rt.out.EmitJSONL(items)
 		default:
 			return rt.out.EmitJSONL([]any{data})
 		}
@@ -90,6 +99,71 @@ func renderReady(w *output.Writer, result *app.ReadyResult, now time.Time) {
 	for _, item := range result.Issues {
 		w.Print(w.IssueLine(item.Issue, now, idWidth))
 	}
+}
+
+// lb-rd7
+func renderNext(w *output.Writer, result *app.NextResult, now time.Time, verbose bool) {
+	if result.Recommendation == nil {
+		w.Print("No claimable work is currently available.")
+		w.Blank()
+		if result.BlockedCount > 0 {
+			w.Print(fmt.Sprintf("Open tasks are blocked by %d unresolved issue%s.", result.BlockedCount, pluralNoun(result.BlockedCount)))
+			w.Print("Run `lb blocked` to inspect them.")
+		}
+		return
+	}
+	rec := result.Recommendation
+	issue := rec.Issue
+	w.Print(w.Style(output.StyleBold, "Recommended next task"))
+	w.Blank()
+	w.Print(w.PriorityLabel(issue.Priority) + "  " + w.Style(output.StyleID, output.SanitizeLine(issue.ID)) + "  " + output.SanitizeLine(issue.Title))
+	claim := "unclaimed"
+	if issue.Assignee != nil && issue.Assignee.String() != "" {
+		claim = "claimed by " + output.SanitizeLine(issue.Assignee.String())
+	}
+	w.Print("Status: ready · " + claim + " · type: " + string(issue.Type))
+	w.Print("Reason: " + reasonFromFactors(rec.Factors))
+	w.Print("Age: " + output.RelativeTime(issue.Age(now)))
+	if verbose {
+		w.Blank()
+		w.Print(w.Style(output.StyleDim, fmt.Sprintf("strategy %s · score %.1f", rec.Strategy, rec.Score)))
+		for _, f := range rec.Factors {
+			w.Print(fmt.Sprintf("  %s  value %.1f × %.0f = %.1f  %s", f.Kind, f.Value, f.Weight, f.Contribution, f.Explanation))
+		}
+	}
+	if len(result.Alternatives) > 0 {
+		w.Blank()
+		w.Print(w.Style(output.StyleBold, "Also consider"))
+		for _, alt := range result.Alternatives {
+			w.Print("  " + w.PriorityLabel(alt.Issue.Priority) + "  " + w.Style(output.StyleID, output.SanitizeLine(alt.Issue.ID)) + "  " + output.SanitizeLine(alt.Issue.Title))
+		}
+	}
+	steps := []string{"lb show " + issue.ID, "lb why " + issue.ID}
+	if issue.Assignee == nil || issue.Assignee.String() == "" {
+		steps = append([]string{"lb claim " + issue.ID}, steps...)
+	}
+	w.NextSteps(steps...)
+}
+
+func reasonFromFactors(factors []app.Factor) string {
+	parts := make([]string, 0, len(factors))
+	for _, f := range factors {
+		if f.Explanation == "" {
+			continue
+		}
+		parts = append(parts, strings.TrimSuffix(f.Explanation, "."))
+	}
+	if len(parts) == 0 {
+		return "highest ranked ready work"
+	}
+	return strings.Join(parts, "; ") + "."
+}
+
+func pluralNoun(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
 }
 
 func renderShow(w *output.Writer, result *app.ShowResult, now time.Time, events bool) {
