@@ -3,3 +3,4 @@
 *.test
 .beads/embeddeddolt/
 .beads/*.db
+.omc/state/
