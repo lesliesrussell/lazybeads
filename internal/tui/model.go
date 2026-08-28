@@ -85,6 +85,7 @@ type Model struct {
 	showArgv    bool
 	copied      string
 	lastRefresh time.Time
+	pane        int // 0 list, 1 preview — lazygit-style focused panel
 }
 
 type listRow struct {
@@ -253,21 +254,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.rows = readyRows(msg.res, m.filter)
 		m.clampCursor()
 		m.lastRefresh = app.Now()
+		return m, m.previewCmd()
 	case focusMsg:
 		m.loading = false
 		m.focus = msg.res
 		m.rows = focusRows(msg.res, m.filter)
 		m.clampCursor()
+		return m, m.previewCmd()
 	case blockedMsg:
 		m.loading = false
 		m.blocked = msg.res
 		m.rows = blockedRows(msg.res, m.filter)
 		m.clampCursor()
+		return m, m.previewCmd()
 	case issuesMsg:
 		m.loading = false
 		m.issues = msg.issues
 		m.rows = issueRows(msg.issues, m.filter)
 		m.clampCursor()
+		return m, m.previewCmd()
 	case showMsg:
 		m.loading = false
 		m.detail = msg.res
@@ -332,6 +337,34 @@ func (m Model) visibleRows() []listRow {
 	return out
 }
 
+func (m Model) wide() bool {
+	return m.width >= 100 && (m.view == viewReady || m.view == viewFocus || m.view == viewBlocked || m.view == viewIssues || m.view == viewActivity || m.view == viewMemory)
+}
+
+func (m Model) previewCmd() tea.Cmd {
+	if !m.wide() {
+		return nil
+	}
+	row, ok := m.currentRow()
+	if !ok || row.ID == "" {
+		return nil
+	}
+	if m.detail != nil && m.detail.Detail.ID == row.ID {
+		return nil
+	}
+	svc := m.svc
+	id := row.ID
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		res, err := svc.Show(ctx, id, app.ShowRequest{})
+		if err != nil {
+			return nil
+		}
+		return showMsg{res}
+	}
+}
+
 func (m Model) currentRow() (listRow, bool) {
 	rows := m.visibleRows()
 	if m.cursor < 0 || m.cursor >= len(rows) {
@@ -349,7 +382,7 @@ func readyRows(res *app.ReadyResult, filter string) []listRow {
 		out = append(out, listRow{
 			ID:    item.Issue.ID,
 			Title: item.Issue.Title,
-			Meta:  fmt.Sprintf("%s  +%d  %s", item.Issue.Priority.Label(), item.Downstream, output.RelativeTime(item.Issue.Age(app.Now()))),
+			Meta:  fmt.Sprintf("+%d  %s", item.Downstream, output.RelativeTime(item.Issue.Age(app.Now()))),
 			Issue: item.Issue,
 		})
 	}

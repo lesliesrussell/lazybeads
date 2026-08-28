@@ -4,6 +4,8 @@ The TUI is fully usable without a mouse. Arrows always work; `j`/`k` are additio
 
 | Key | Action |
 |---|---|
+The TUI is a lazygit-style tiled console: stats header, context tabs, a list panel beside a live preview, and a coloured keybinding bar. `tab` moves focus between list and preview. Below 100 columns the preview pane hides.
+
 | `j` / `k` or arrows | Move |
 | `ctrl-d` / `ctrl-u` | Half-page |
 | `G` | Last item |

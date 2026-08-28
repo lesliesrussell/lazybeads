@@ -106,3 +106,31 @@ func TestQuitAtTopLevel(t *testing.T) {
 		t.Fatal("q at top level should quit")
 	}
 }
+
+func TestWideLayoutIsDualPaneWithBorders(t *testing.T) {
+	m, _ := testModel(t)
+	m = pump(m, m.Init())
+	view := m.View()
+	if !strings.Contains(view, "Preview") {
+		t.Fatalf("wide layout must show a Preview pane:\n%s", view)
+	}
+	if !strings.Contains(view, "Ready") {
+		t.Fatalf("list pane title missing:\n%s", view)
+	}
+	if !strings.ContainsAny(view, "+-|") {
+		t.Fatalf("ASCII mode should draw box borders:\n%s", view)
+	}
+	if !strings.Contains(view, "❯") && !strings.Contains(view, ">") {
+		t.Fatalf("selected row needs a caret:\n%s", view)
+	}
+}
+
+func TestNarrowLayoutHidesPreview(t *testing.T) {
+	m, _ := testModel(t)
+	m.width = 80
+	m = pump(m, m.Init())
+	view := m.View()
+	if strings.Contains(view, "Preview") {
+		t.Fatalf("narrow layout should be a single pane:\n%s", view)
+	}
+}

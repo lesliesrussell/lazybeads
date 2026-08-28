@@ -47,9 +47,11 @@ func (m Model) handleNavKey(k string) (tea.Model, tea.Cmd) {
 	case "j", "down":
 		m.cursor++
 		m.clampCursor()
+		return m, m.previewCmd()
 	case "k", "up":
 		m.cursor--
 		m.clampCursor()
+		return m, m.previewCmd()
 	case "ctrl+d":
 		m.cursor += 10
 		m.clampCursor()
@@ -124,6 +126,11 @@ func (m Model) handleNavKey(k string) (tea.Model, tea.Cmd) {
 		m.input = ""
 	case "?":
 		m.overlay = overlayHelp
+	case "tab":
+		if m.wide() {
+			m.pane = 1 - m.pane
+		}
+		return m, nil
 	case "y":
 		if row, ok := m.currentRow(); ok {
 			m.copied = row.ID
