@@ -131,8 +131,9 @@ func TestPanelTitleIsNotClipped(t *testing.T) {
 	box := drawPanel(th, "Issues", "row", 22, 5, true)
 	top := strings.Split(box, "\n")[0]
 	vis := stripANSI(top)
-	if !strings.Contains(vis, " Issues ") {
-		t.Fatalf("title missing or clipped on top border: %q (raw %q)", vis, top)
+	// lb-xqh
+	if !strings.Contains(vis, "─ Issues ") && !strings.Contains(vis, "- Issues ") {
+		t.Fatalf("title missing or not seated on the top rule: %q (raw %q)", vis, top)
 	}
 	if lipgloss.Width(top) != 22 {
 		t.Errorf("top border width = %d, want 22", lipgloss.Width(top))
@@ -144,12 +145,15 @@ func TestPanelTitleIsNotClipped(t *testing.T) {
 	if right != '╮' && right != '┐' && right != '+' {
 		t.Errorf("right corner overwritten: %q", vis)
 	}
+	if strings.Contains(top, "m╭\x1b[0m Issues") || strings.Contains(top, "m+\x1b[0m Issues") {
+		t.Fatalf("title is unstyled in a hole after the corner: %q", top)
+	}
 
 	thASCII := newTheme(Options{Color: false, ASCII: true})
 	box = drawPanel(thASCII, "Issues", "row", 22, 5, true)
 	vis = stripANSI(strings.Split(box, "\n")[0])
-	if !strings.Contains(vis, " Issues ") {
-		t.Fatalf("ASCII title clipped: %q", vis)
+	if !strings.Contains(vis, "- Issues ") {
+		t.Fatalf("ASCII title not seated on the top rule: %q", vis)
 	}
 }
 

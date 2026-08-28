@@ -45,12 +45,14 @@ func newTheme(opts Options) theme {
 	if opts.ASCII {
 		border = lipgloss.ASCIIBorder()
 	}
-	ns := lipgloss.NewStyle
-	if !opts.Color {
-		r := lipgloss.NewRenderer(&bytes.Buffer{})
+	// lb-xqh
+	r := lipgloss.NewRenderer(&bytes.Buffer{})
+	if opts.Color {
+		r.SetColorProfile(termenv.ANSI256)
+	} else {
 		r.SetColorProfile(termenv.Ascii)
-		ns = r.NewStyle
 	}
+	ns := r.NewStyle
 
 	if opts.Color {
 		th.focused = ns().Border(border).BorderForeground(lipgloss.Color("10"))

@@ -152,15 +152,29 @@ func drawPanel(th theme, title, content string, width, height int, focused bool)
 		paint = th.borderOn
 	}
 
-	label := " " + strings.TrimSpace(title) + " "
-	if output.Width(label) > innerW {
-		label = " " + output.Truncate(strings.TrimSpace(title), max(1, innerW-2)) + " "
+	// lb-xqh
+	titleText := strings.TrimSpace(title)
+	label := " " + titleText + " "
+	lead := 1
+	if lead+output.Width(label) > innerW {
+		room := innerW - lead - 2
+		if room < 1 {
+			lead = 0
+			room = innerW - 2
+		}
+		if room < 1 {
+			label = output.Truncate(titleText, max(1, innerW))
+		} else {
+			label = " " + output.Truncate(titleText, room) + " "
+		}
 	}
-	fill := innerW - output.Width(label)
+	fill := innerW - lead - output.Width(label)
 	if fill < 0 {
 		fill = 0
 	}
-	top := paint.Render(border.TopLeft) + label + paint.Render(strings.Repeat(border.Top, fill)+border.TopRight)
+	top := paint.Render(border.TopLeft+strings.Repeat(border.Top, lead)) +
+		th.title.Render(label) +
+		paint.Render(strings.Repeat(border.Top, fill)+border.TopRight)
 	bot := paint.Render(border.BottomLeft + strings.Repeat(border.Bottom, innerW) + border.BottomRight)
 	sideL := paint.Render(border.Left)
 	sideR := paint.Render(border.Right)
