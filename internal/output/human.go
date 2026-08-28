@@ -39,7 +39,12 @@ func Ago(t *time.Time, now time.Time) string {
 	if t == nil {
 		return "unknown"
 	}
-	return RelativeTime(now.Sub(*t)) + " ago"
+	rel := RelativeTime(now.Sub(*t))
+	// lb-58x
+	if rel == "just now" {
+		return rel
+	}
+	return rel + " ago"
 }
 
 // StatusLabel pairs a symbol with the status word, so status is never conveyed

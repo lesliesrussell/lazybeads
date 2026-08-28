@@ -99,6 +99,33 @@ func TestDecodeShowIsArrayWrapped(t *testing.T) {
 	}
 }
 
+func TestDecodeListAcceptsStringMetadataOnDependencies(t *testing.T) {
+	const fixture = `[
+  {
+    "id": "lb-58x",
+    "title": "Read commands",
+    "status": "in_progress",
+    "priority": 1,
+    "issue_type": "task",
+    "dependencies": [
+      {
+        "issue_id": "lb-58x",
+        "depends_on_id": "lb-nvw",
+        "type": "blocks",
+        "metadata": "{}"
+      }
+    ]
+  }
+]`
+	issues, err := decodeIssues([]byte(fixture))
+	if err != nil {
+		t.Fatalf("bd 1.0.5 list payloads encode dependency metadata as a string: %v", err)
+	}
+	if len(issues) != 1 || issues[0].ID != "lb-58x" {
+		t.Fatalf("issues = %+v", issues)
+	}
+}
+
 // TestClosedDependencyIsNotABlocker verifies readiness reasoning ignores
 // resolved blockers.
 func TestClosedDependencyIsNotABlocker(t *testing.T) {

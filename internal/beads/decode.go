@@ -44,7 +44,7 @@ type rawIssue struct {
 
 	CloseReason string `json:"close_reason"`
 
-	Metadata map[string]any `json:"metadata"`
+	Metadata json.RawMessage `json:"metadata"`
 
 	DependencyCount int `json:"dependency_count"`
 	DependentCount  int `json:"dependent_count"`
@@ -173,7 +173,7 @@ func (r rawIssue) toIssue() domain.Issue {
 		Type:            domain.IssueType(firstNonEmpty(r.IssueType, r.AltType)),
 		Priority:        parsePriority(r.Priority),
 		Labels:          r.Labels,
-		Metadata:        r.Metadata,
+		Metadata:        parseMetadata(r.Metadata),
 		DependencyCount: r.DependencyCount,
 		DependentCount:  r.DependentCount,
 		CommentCount:    r.CommentCount,
@@ -220,6 +220,33 @@ func actorFrom(s string) *domain.Actor {
 		return &domain.Actor{Name: s, Email: s}
 	}
 	return &domain.Actor{Name: s}
+}
+
+// lb-58x
+func parseMetadata(raw json.RawMessage) map[string]any {
+	raw = json.RawMessage(strings.TrimSpace(string(raw)))
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	if raw[0] == '"' {
+		var s string
+		if err := json.Unmarshal(raw, &s); err != nil {
+			return nil
+		}
+		if s == "" || s == "{}" {
+			return map[string]any{}
+		}
+		var m map[string]any
+		if err := json.Unmarshal([]byte(s), &m); err == nil {
+			return m
+		}
+		return map[string]any{"_raw": s}
+	}
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return nil
+	}
+	return m
 }
 
 func parsePriority(n *json.Number) domain.Priority {

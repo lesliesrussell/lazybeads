@@ -200,6 +200,15 @@ func TestRelativeTime(t *testing.T) {
 	if got := Ago(nil, time.Now()); got != "unknown" {
 		t.Errorf("a missing timestamp should read %q, got %q", "unknown", got)
 	}
+	now := time.Now()
+	just := now.Add(-2 * time.Second)
+	if got := Ago(&just, now); got != "just now" {
+		t.Errorf("sub-minute timestamps should read just now, got %q", got)
+	}
+	older := now.Add(-3 * time.Hour)
+	if got := Ago(&older, now); got != "3h ago" {
+		t.Errorf("older timestamps should keep the ago suffix, got %q", got)
+	}
 }
 
 // TestIssueLineFitsNarrowTerminal covers the 80-column floor and the degraded

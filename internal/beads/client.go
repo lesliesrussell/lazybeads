@@ -398,7 +398,9 @@ func (c *CLI) List(ctx context.Context, q ListQuery) ([]domain.Issue, error) {
 	if q.All {
 		args = append(args, "--all")
 	}
-	args = append(args, "--limit", strconv.Itoa(q.Limit))
+	if q.Limit > 0 {
+		args = append(args, "--limit", strconv.Itoa(q.Limit))
+	}
 	out, err := c.jsonCall(ctx, "list", q.Scope, args...)
 	if err != nil {
 		return nil, err
