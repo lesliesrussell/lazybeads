@@ -38,6 +38,8 @@ type runtime struct {
 	quiet   bool
 	verbose bool
 	debug   bool
+	yes     bool
+	dryRun  bool
 
 	project  string
 	beadsDir string
@@ -110,6 +112,8 @@ func (rt *runtime) root() *cobra.Command {
 	f.StringVar(&rt.rig, "rig", "", "cross-rig selection")
 	f.StringVar(&rt.actor, "actor", "", "operator identity")
 	f.StringVar(&rt.timeout, "timeout", "", "bd command timeout (for example 30s)")
+	f.BoolVar(&rt.yes, "yes", false, "skip interactive confirmation of mutations")
+	f.BoolVar(&rt.dryRun, "dry-run", false, "print the intended bd argv without executing it")
 
 	cmd.AddCommand(rt.statusCmd())
 	cmd.AddCommand(rt.readyCmd())
@@ -117,6 +121,14 @@ func (rt *runtime) root() *cobra.Command {
 	cmd.AddCommand(rt.showCmd())
 	cmd.AddCommand(rt.listCmd())
 	cmd.AddCommand(rt.searchCmd())
+	cmd.AddCommand(rt.createCmd())
+	cmd.AddCommand(rt.editCmd())
+	cmd.AddCommand(rt.claimCmd())
+	cmd.AddCommand(rt.unclaimCmd())
+	cmd.AddCommand(rt.closeCmd())
+	cmd.AddCommand(rt.reopenCmd())
+	cmd.AddCommand(rt.assignCmd())
+	cmd.AddCommand(rt.depCmd())
 	cmd.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print the LazyBeads version",

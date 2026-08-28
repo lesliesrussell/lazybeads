@@ -3,11 +3,13 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/lesliesrussell/lazybeads/internal/app"
+	"github.com/lesliesrussell/lazybeads/internal/beads"
 	"github.com/lesliesrussell/lazybeads/internal/config"
 	"github.com/lesliesrussell/lazybeads/internal/domain"
 	"github.com/lesliesrussell/lazybeads/internal/workspace"
@@ -23,6 +25,7 @@ func testCLI(t *testing.T, client *app.MemClient, args ...string) (stdout, stder
 		Service: svc,
 		Stdout:  &out,
 		Stderr:  &errOut,
+		Stdin:   bytes.NewReader(nil),
 		Args:    args,
 	})
 	return out.String(), errOut.String(), code
@@ -184,5 +187,79 @@ func TestNextUnknownStrategyExitsUsage(t *testing.T) {
 	_, errOut, code := testCLI(t, fixtureCLI(t), "next", "--strategy", "magic")
 	if code != domain.ExitUsage {
 		t.Fatalf("exit %d, want %d; stderr=%s", code, domain.ExitUsage, errOut)
+	}
+}
+
+func TestClaimWithoutYesRefusesNonInteractive(t *testing.T) {
+	_, errOut, code := testCLI(t, fixtureCLI(t), "claim", "lb-1")
+	if code != domain.ExitUsage {
+		t.Fatalf("exit %d, want %d; stderr=%s", code, domain.ExitUsage, errOut)
+	}
+	if !strings.Contains(errOut, "--yes") {
+		t.Errorf("stderr = %q, want a --yes hint", errOut)
+	}
+}
+
+func TestClaimYesUpdatesIssue(t *testing.T) {
+	f := fixtureCLI(t)
+	out, errOut, code := testCLI(t, f, "claim", "lb-1", "--yes")
+	if code != 0 {
+		t.Fatalf("exit %d stderr=%s stdout=%s", code, errOut, out)
+	}
+	if !strings.Contains(out, "Claimed lb-1") {
+		t.Errorf("stdout = %s", out)
+	}
+}
+
+func TestClaimDryRunDoesNotMutate(t *testing.T) {
+	f := fixtureCLI(t)
+	out, _, code := testCLI(t, f, "claim", "lb-1", "--dry-run")
+	if code != 0 {
+		t.Fatalf("exit %d stdout=%s", code, out)
+	}
+	if !strings.Contains(out, "Dry run") && !strings.Contains(out, "bd ") {
+		t.Errorf("dry-run output = %s", out)
+	}
+	got, err := f.Show(context.Background(), "lb-1", beads.Scope{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != domain.StatusOpen {
+		t.Errorf("dry-run mutated status to %s", got.Status)
+	}
+}
+
+func TestCloseYesListsNewlyReady(t *testing.T) {
+	f := fixtureCLI(t)
+	out, errOut, code := testCLI(t, f, "close", "lb-1", "--reason", "done", "--yes")
+	if code != 0 {
+		t.Fatalf("exit %d stderr=%s stdout=%s", code, errOut, out)
+	}
+	if !strings.Contains(out, "Closed lb-1") {
+		t.Errorf("stdout = %s", out)
+	}
+	if !strings.Contains(out, "lb-2") {
+		t.Errorf("expected newly ready lb-2 in:\n%s", out)
+	}
+}
+
+func TestCreateYes(t *testing.T) {
+	f := fixtureCLI(t)
+	out, errOut, code := testCLI(t, f, "create", "Handle schema mismatch", "--type", "bug", "--priority", "1", "--yes")
+	if code != 0 {
+		t.Fatalf("exit %d stderr=%s stdout=%s", code, errOut, out)
+	}
+	if !strings.Contains(out, "Created") {
+		t.Errorf("stdout = %s", out)
+	}
+}
+
+func TestDepAddDryRunKeepsArgumentOrder(t *testing.T) {
+	out, _, code := testCLI(t, fixtureCLI(t), "dep", "add", "lb-2", "lb-1", "--dry-run")
+	if code != 0 {
+		t.Fatalf("exit %d stdout=%s", code, out)
+	}
+	if !strings.Contains(out, "dep add lb-2 lb-1") {
+		t.Errorf("argv order lost in:\n%s", out)
 	}
 }

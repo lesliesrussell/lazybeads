@@ -20,10 +20,15 @@ func (rt *runtime) handleError(err error) int {
 	}
 
 	var usage *app.UsageError
+	var declined *app.DeclinedError
 	if errors.As(err, &usage) {
 		code = domain.ExitUsage
 		payload.Code = "usage"
 		payload.Message = usage.Message
+	} else if errors.As(err, &declined) {
+		code = domain.ExitDeclined
+		payload.Code = "declined"
+		payload.Message = declined.Error()
 	} else if ce, ok := beads.AsCommandError(err); ok {
 		code = ce.ExitCode2()
 		payload.Code = string(ce.Kind)

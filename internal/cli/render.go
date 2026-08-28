@@ -24,6 +24,8 @@ func (rt *runtime) emit(command string, data any, warnings []string) error {
 			return rt.out.EmitJSONL(output.IssuesAsAny(v.Issues))
 		case *app.SearchResult:
 			return rt.out.EmitJSONL(output.IssuesAsAny(v.Issues))
+		case *app.MutationResult:
+			return rt.out.EmitJSONL([]any{v})
 		case *app.NextResult:
 			items := []any{}
 			if v.Recommendation != nil {
@@ -164,6 +166,68 @@ func pluralNoun(n int) string {
 		return ""
 	}
 	return "s"
+}
+
+func renderMutation(w *output.Writer, result *app.MutationResult) {
+	if result.DryRun {
+		w.Print("Dry run: would execute")
+		w.Print("  " + strings.Join(result.Argv, " "))
+		for _, warn := range result.Warnings {
+			w.Warn(warn)
+		}
+		return
+	}
+	w.Print(result.Message + ".")
+	if result.Issue.ID != "" {
+		w.Blank()
+		w.Print(w.PriorityLabel(result.Issue.Priority) + "  " + w.Style(output.StyleID, output.SanitizeLine(result.Issue.ID)) + "  " + output.SanitizeLine(result.Issue.Title))
+		w.Print(w.StatusLabel(result.Issue.Status))
+		if result.Issue.Assignee != nil && result.Issue.Assignee.String() != "" {
+			w.Print("Assignee: " + output.SanitizeLine(result.Issue.Assignee.String()))
+		}
+	}
+	for _, warn := range result.Warnings {
+		w.Warn(warn)
+	}
+	if len(result.NewlyReady) > 0 {
+		w.Blank()
+		w.Print(w.Style(output.StyleBold, "Newly ready"))
+		for _, i := range result.NewlyReady {
+			w.Print("  " + w.PriorityLabel(i.Priority) + " " + w.Style(output.StyleID, output.SanitizeLine(i.ID)) + " · " + output.SanitizeLine(i.Title))
+		}
+	}
+}
+
+func renderDepList(w *output.Writer, id string, blockers, dependents []domain.Dependency) {
+	w.Print(w.Style(output.StyleBold, "Dependencies for "+output.SanitizeLine(id)))
+	w.Blank()
+	w.Print(w.Heading("Blockers"))
+	if len(blockers) == 0 {
+		w.Print("  none")
+	} else {
+		for _, d := range blockers {
+			w.Print("  " + string(d.Type) + "  " + w.Style(output.StyleID, output.SanitizeLine(d.Issue.ID)) + "  " + output.SanitizeLine(d.Issue.Title))
+		}
+	}
+	w.Print(w.Heading("Dependents"))
+	if len(dependents) == 0 {
+		w.Print("  none")
+	} else {
+		for _, d := range dependents {
+			w.Print("  " + string(d.Type) + "  " + w.Style(output.StyleID, output.SanitizeLine(d.Issue.ID)) + "  " + output.SanitizeLine(d.Issue.Title))
+		}
+	}
+}
+
+func renderDepValidate(w *output.Writer, report *app.DepReport) {
+	if report.CycleCount == 0 {
+		w.Print("No dependency cycles detected.")
+		return
+	}
+	w.Print(fmt.Sprintf("%d dependency cycle(s)", report.CycleCount))
+	for _, c := range report.Cycles {
+		w.Print("  " + strings.Join(c, " -> "))
+	}
 }
 
 func renderShow(w *output.Writer, result *app.ShowResult, now time.Time, events bool) {
