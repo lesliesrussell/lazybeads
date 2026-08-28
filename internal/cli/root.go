@@ -104,8 +104,11 @@ func (rt *runtime) root() *cobra.Command {
 			return err
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if isInteractive(rt.opts.Stdin) && isInteractiveWriter(rt.opts.Stdout) {
+				return rt.runTUI("", "")
+			}
 			_ = cmd.Help()
-			return &app.UsageError{Message: "a command is required; try `lb status` or `lb ready`"}
+			return &app.UsageError{Message: "a command is required; try `lb status` or `lb tui`"}
 		},
 	}
 	cmd.SetVersionTemplate("lazybeads {{.Version}}\n")
@@ -150,6 +153,7 @@ func (rt *runtime) root() *cobra.Command {
 	cmd.AddCommand(rt.whyCmd())
 	cmd.AddCommand(rt.graphCmd())
 	cmd.AddCommand(rt.blockedCmd())
+	cmd.AddCommand(rt.tuiCmd())
 	cmd.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print the LazyBeads version",

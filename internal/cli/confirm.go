@@ -23,6 +23,14 @@ func isInteractive(r io.Reader) bool {
 	return term.IsTerminal(int(f.Fd()))
 }
 
+func isInteractiveWriter(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	return term.IsTerminal(int(f.Fd()))
+}
+
 func (rt *runtime) confirm(plan *app.MutationResult) error {
 	if rt.dryRun {
 		return nil
