@@ -127,41 +127,76 @@ func (m Model) renderBody(th theme, height int) string {
 }
 
 func (m Model) panel(th theme, title, content string, width, height int, focused bool) string {
-	innerW := width - 2
-	innerH := height - 2
-	if innerW < 8 {
-		innerW = 8
-	}
-	if innerH < 1 {
-		innerH = 1
-	}
-	st := th.inactive
-	if focused {
-		st = th.focused
-	}
-	boxed := st.Width(innerW).Height(innerH).MaxWidth(width).MaxHeight(height).Render(content)
-	return titleOnBorder(boxed, title)
+	return drawPanel(th, title, content, width, height, focused)
 }
 
-func titleOnBorder(boxed, title string) string {
-	if title == "" {
-		return boxed
+// lb-q9m
+// drawPanel paints a lazygit-style box with the title in the top border.
+// The chrome is drawn as plain box-drawing characters and then coloured, so
+// a title can never punch through ANSI sequences or clip a corner.
+func drawPanel(th theme, title, content string, width, height int, focused bool) string {
+	border := lipgloss.RoundedBorder()
+	if th.ascii {
+		border = lipgloss.ASCIIBorder()
 	}
-	lines := strings.Split(boxed, "\n")
-	if len(lines) == 0 {
-		return boxed
+	if width < 4 {
+		width = 4
 	}
-	runes := []rune(lines[0])
-	label := []rune(" " + title + " ")
-	start := 2
-	for i, r := range label {
-		if start+i >= len(runes)-1 {
-			break
+	if height < 3 {
+		height = 3
+	}
+	innerW := width - 2
+	innerH := height - 2
+	paint := th.borderOff
+	if focused {
+		paint = th.borderOn
+	}
+
+	label := " " + strings.TrimSpace(title) + " "
+	if output.Width(label) > innerW {
+		label = " " + output.Truncate(strings.TrimSpace(title), max(1, innerW-2)) + " "
+	}
+	fill := innerW - output.Width(label)
+	if fill < 0 {
+		fill = 0
+	}
+	top := paint.Render(border.TopLeft) + label + paint.Render(strings.Repeat(border.Top, fill)+border.TopRight)
+	bot := paint.Render(border.BottomLeft + strings.Repeat(border.Bottom, innerW) + border.BottomRight)
+	sideL := paint.Render(border.Left)
+	sideR := paint.Render(border.Right)
+
+	raw := strings.Split(strings.TrimRight(content, "\n"), "\n")
+	if content == "" {
+		raw = nil
+	}
+	var b strings.Builder
+	b.WriteString(top)
+	b.WriteByte('\n')
+	for i := 0; i < innerH; i++ {
+		line := ""
+		if i < len(raw) {
+			line = raw[i]
 		}
-		runes[start+i] = r
+		b.WriteString(sideL)
+		b.WriteString(fitCellWidth(line, innerW))
+		b.WriteString(sideR)
+		b.WriteByte('\n')
 	}
-	lines[0] = string(runes)
-	return strings.Join(lines, "\n")
+	b.WriteString(bot)
+	return b.String()
+}
+
+func fitCellWidth(s string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	if lipgloss.Width(s) > width {
+		s = lipgloss.NewStyle().MaxWidth(width).Inline(true).Render(s)
+	}
+	if pad := width - lipgloss.Width(s); pad > 0 {
+		s += strings.Repeat(" ", pad)
+	}
+	return s
 }
 
 func (m Model) renderList(th theme, width, height int) string {

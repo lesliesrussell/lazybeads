@@ -35,6 +35,8 @@ type theme struct {
 	tabOff    lipgloss.Style
 	statusBar lipgloss.Style
 	modal     lipgloss.Style
+	borderOn  lipgloss.Style
+	borderOff lipgloss.Style
 }
 
 func newTheme(opts Options) theme {
@@ -69,6 +71,8 @@ func newTheme(opts Options) theme {
 		th.tabOff = ns().Foreground(lipgloss.Color("250")).Padding(0, 1)
 		th.statusBar = ns().Foreground(lipgloss.Color("250")).Background(lipgloss.Color("236"))
 		th.modal = ns().Border(border).BorderForeground(lipgloss.Color("11")).Padding(1, 2)
+		th.borderOn = ns().Foreground(lipgloss.Color("10")).Bold(true)
+		th.borderOff = ns().Foreground(lipgloss.Color("240"))
 	} else {
 		th.focused = ns().Border(border).Bold(true)
 		th.inactive = ns().Border(border)
@@ -88,6 +92,8 @@ func newTheme(opts Options) theme {
 		th.tabOff = ns().Padding(0, 1)
 		th.statusBar = ns().Reverse(true)
 		th.modal = ns().Border(border).Padding(1, 2).Bold(true)
+		th.borderOn = ns().Bold(true)
+		th.borderOff = ns()
 	}
 	return th
 }

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/lesliesrussell/lazybeads/internal/app"
 	"github.com/lesliesrussell/lazybeads/internal/beads"
@@ -123,6 +124,78 @@ func TestWideLayoutIsDualPaneWithBorders(t *testing.T) {
 	if !strings.Contains(view, "❯") && !strings.Contains(view, ">") {
 		t.Fatalf("selected row needs a caret:\n%s", view)
 	}
+}
+
+func TestPanelTitleIsNotClipped(t *testing.T) {
+	th := newTheme(Options{Color: true, ASCII: false})
+	box := drawPanel(th, "Issues", "row", 22, 5, true)
+	top := strings.Split(box, "\n")[0]
+	vis := stripANSI(top)
+	if !strings.Contains(vis, " Issues ") {
+		t.Fatalf("title missing or clipped on top border: %q (raw %q)", vis, top)
+	}
+	if lipgloss.Width(top) != 22 {
+		t.Errorf("top border width = %d, want 22", lipgloss.Width(top))
+	}
+	left, right := []rune(vis)[0], []rune(vis)[len([]rune(vis))-1]
+	if left != '╭' && left != '┌' && left != '+' {
+		t.Errorf("left corner overwritten: %q", vis)
+	}
+	if right != '╮' && right != '┐' && right != '+' {
+		t.Errorf("right corner overwritten: %q", vis)
+	}
+
+	thASCII := newTheme(Options{Color: false, ASCII: true})
+	box = drawPanel(thASCII, "Issues", "row", 22, 5, true)
+	vis = stripANSI(strings.Split(box, "\n")[0])
+	if !strings.Contains(vis, " Issues ") {
+		t.Fatalf("ASCII title clipped: %q", vis)
+	}
+}
+
+func TestIssuesViewKeepsFullPanelTitle(t *testing.T) {
+	m, _ := testModel(t)
+	m.opts.Color = true
+	m.opts.ASCII = false
+	m = pump(m, m.Init())
+	nm, cmd := m.Update(key("i"))
+	m = pump(nm.(Model), cmd)
+	var titled string
+	for _, line := range strings.Split(m.View(), "\n") {
+		vis := stripANSI(line)
+		if strings.Contains(vis, "Issues") && (strings.Contains(vis, "─") || strings.Contains(vis, "-")) {
+			titled = vis
+			break
+		}
+	}
+	if titled == "" {
+		t.Fatalf("no Issues panel title in:\n%s", m.View())
+	}
+	if !strings.Contains(titled, " Issues ") && !strings.Contains(titled, "Issues") {
+		t.Fatalf("clipped panel title: %q", titled)
+	}
+	if strings.Contains(titled, "Issue ") && !strings.Contains(titled, "Issues") {
+		t.Fatalf("left title was truncated to %q", titled)
+	}
+}
+
+func stripANSI(s string) string {
+	var b strings.Builder
+	skip := false
+	for _, r := range s {
+		if r == 0x1b {
+			skip = true
+			continue
+		}
+		if skip {
+			if r >= 0x40 && r <= 0x7e && r != '[' {
+				skip = false
+			}
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 func TestNarrowLayoutHidesPreview(t *testing.T) {
