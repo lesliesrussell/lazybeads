@@ -1,0 +1,3 @@
+READY · 1 task
+
+P1  lb-1      Add typed bd adapter                            +1 downstream - 1h

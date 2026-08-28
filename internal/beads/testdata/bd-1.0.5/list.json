@@ -1,0 +1,18 @@
+[
+  {
+    "id": "lb-17y",
+    "title": "Tests, golden files, fuzzing, docs",
+    "status": "in_progress",
+    "priority": 1,
+    "issue_type": "task",
+    "assignee": "Leslie Russell",
+    "owner": "leslierussell@gmail.com",
+    "created_at": "2026-08-28T14:17:07Z",
+    "created_by": "Leslie Russell",
+    "updated_at": "2026-08-28T20:26:51Z",
+    "started_at": "2026-08-28T20:26:51Z",
+    "dependency_count": 0,
+    "dependent_count": 0,
+    "comment_count": 0
+  }
+]

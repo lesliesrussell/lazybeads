@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "command": "why",
+  "workspace": {
+    "root_path": "/fake",
+    "rig": null
+  },
+  "data": {
+    "issue_id": "lb-2",
+    "title": "Implement lb status",
+    "status": "open",
+    "ready": false,
+    "closed": false,
+    "blocked": true,
+    "deferred": false,
+    "immediate_blockers": [
+      {
+        "id": "lb-1",
+        "title": "Add typed bd adapter",
+        "status": "open",
+        "priority": 1,
+        "actionable": true,
+        "depth": 1
+      }
+    ],
+    "root_blockers": [
+      {
+        "id": "lb-1",
+        "title": "Add typed bd adapter",
+        "status": "open",
+        "priority": 1,
+        "actionable": true,
+        "depth": 1,
+        "path": [
+          "lb-2",
+          "lb-1"
+        ]
+      }
+    ],
+    "unlocks": null,
+    "transitive_unlocks": 0,
+    "truncated": false
+  },
+  "warnings": [],
+  "generated_at": "2026-08-28T15:11:00Z"
+}

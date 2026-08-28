@@ -1,0 +1,18 @@
+lazybeads 0.1.0 · Beads 1.0.5 · /fake
+
+Workspace
+  Storage: embedded · sync: unknown
+  Actor:   operator
+  Updated: just now
+
+Work
+  Ready:       1
+  In progress: 0
+  Blocked:     1
+  Open:        2
+  Closed:      0
+
+Attention
+  ! 1 P1-or-higher task blocked by unclaimed ready work
+
+Run `lb next` for a recommended task.

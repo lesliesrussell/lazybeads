@@ -1,0 +1,10 @@
+lazybeads 0.1.0 · doctor
+Health: - info
+
++ bd_version  Beads 1.0.5
++ json_parse  Beads JSON output decodes
++ workspace  Workspace /fake
++ actor  Actor operator
+- config  Using built-in defaults (no config file)
+- editor  No $VISUAL/$EDITOR set; `lb edit --open-in-editor` is unavailable
+- sync  Sync: unknown (LazyBeads could not determine remote status)

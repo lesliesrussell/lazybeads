@@ -1,0 +1,11 @@
+Recommended next task
+
+P1  lb-1  Add typed bd adapter
+Status: ready · unclaimed · type: task
+Reason: P1 priority; directly unlocks 1 open issue; age 1h.
+Age: 1h
+
+Next:
+  lb claim lb-1
+  lb show lb-1
+  lb why lb-1

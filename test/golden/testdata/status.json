@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "command": "status",
+  "workspace": {
+    "root_path": "/fake",
+    "rig": null
+  },
+  "data": {
+    "workspace": {
+      "root_path": "/fake",
+      "rig": null
+    },
+    "bd_version": "1.0.5",
+    "storage": "embedded",
+    "actor": "operator",
+    "updated_at": "2026-08-28T15:11:00Z",
+    "counts": {
+      "ready": 1,
+      "open": 2,
+      "in_progress": 0,
+      "blocked": 1,
+      "closed": 0
+    },
+    "attention": [
+      {
+        "kind": "blocked_by_unclaimed_ready",
+        "summary": "1 P1-or-higher task blocked by unclaimed ready work",
+        "ids": [
+          "lb-2"
+        ]
+      }
+    ],
+    "health": {
+      "status": "warning",
+      "checks": [
+        {
+          "name": "bd_version",
+          "level": "ok",
+          "summary": "Beads 1.0.5"
+        },
+        {
+          "name": "actor",
+          "level": "ok",
+          "summary": "Actor operator"
+        },
+        {
+          "name": "high_priority_blocked",
+          "level": "warning",
+          "summary": "1 high-priority blocked task",
+          "items": [
+            "lb-2"
+          ]
+        }
+      ]
+    },
+    "generated_at": "2026-08-28T15:11:00Z"
+  },
+  "warnings": [],
+  "generated_at": "2026-08-28T15:11:00Z"
+}

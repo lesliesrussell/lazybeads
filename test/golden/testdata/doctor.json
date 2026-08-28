@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "command": "doctor",
+  "workspace": {
+    "root_path": "/fake",
+    "rig": null
+  },
+  "data": {
+    "health": {
+      "status": "info",
+      "checks": [
+        {
+          "name": "bd_version",
+          "level": "ok",
+          "summary": "Beads 1.0.5"
+        },
+        {
+          "name": "json_parse",
+          "level": "ok",
+          "summary": "Beads JSON output decodes"
+        },
+        {
+          "name": "workspace",
+          "level": "ok",
+          "summary": "Workspace /fake",
+          "detail": "storage embedded"
+        },
+        {
+          "name": "actor",
+          "level": "ok",
+          "summary": "Actor operator"
+        },
+        {
+          "name": "config",
+          "level": "info",
+          "summary": "Using built-in defaults (no config file)"
+        },
+        {
+          "name": "editor",
+          "level": "info",
+          "summary": "No $VISUAL/$EDITOR set; `lb edit --open-in-editor` is unavailable"
+        },
+        {
+          "name": "sync",
+          "level": "info",
+          "summary": "Sync: unknown (LazyBeads could not determine remote status)",
+          "detail": "no remote configured"
+        }
+      ]
+    },
+    "lazybeads_version": "0.1.0",
+    "bd_version": "1.0.5"
+  },
+  "warnings": [],
+  "generated_at": "2026-08-28T15:11:00Z"
+}

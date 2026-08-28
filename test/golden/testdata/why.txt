@@ -1,0 +1,8 @@
+lb-2 is blocked.
+
+IMMEDIATE BLOCKER
+  lb-1 · Add typed bd adapter
+    Status: open
+
+NEAREST CURRENTLY ACTIONABLE ITEM
+  lb-1 · Add typed bd adapter
