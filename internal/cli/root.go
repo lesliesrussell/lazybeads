@@ -47,9 +47,10 @@ type runtime struct {
 	actor    string
 	timeout  string
 
-	cfg config.Config
-	svc *app.Service
-	out *output.Writer
+	cfg      config.Config
+	svc      *app.Service
+	out      *output.Writer
+	setupErr error
 }
 
 // Execute runs the CLI and returns a specification exit code.
@@ -89,7 +90,18 @@ func (rt *runtime) root() *cobra.Command {
 			if cmd.Name() == "version" || cmd.Name() == "help" {
 				return nil
 			}
-			return rt.setup(cmd)
+			err := rt.setup(cmd)
+			if cmd.Name() == "doctor" {
+				rt.setupErr = err
+				if rt.out == nil {
+					rt.out = output.NewWriter(rt.opts.Stdout, rt.opts.Stderr, output.Options{
+						Format: rt.format, Color: firstNonEmpty(rt.color, "auto"),
+						ASCII: rt.ascii, Quiet: rt.quiet, Verbose: rt.verbose, Debug: rt.debug,
+					})
+				}
+				return nil
+			}
+			return err
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_ = cmd.Help()
@@ -129,6 +141,15 @@ func (rt *runtime) root() *cobra.Command {
 	cmd.AddCommand(rt.reopenCmd())
 	cmd.AddCommand(rt.assignCmd())
 	cmd.AddCommand(rt.depCmd())
+	cmd.AddCommand(rt.focusCmd())
+	cmd.AddCommand(rt.staleCmd())
+	cmd.AddCommand(rt.activityCmd())
+	cmd.AddCommand(rt.memoryCmd())
+	cmd.AddCommand(rt.syncCmd())
+	cmd.AddCommand(rt.doctorCmd())
+	cmd.AddCommand(rt.whyCmd())
+	cmd.AddCommand(rt.graphCmd())
+	cmd.AddCommand(rt.blockedCmd())
 	cmd.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print the LazyBeads version",
@@ -148,9 +169,14 @@ func (rt *runtime) setup(cmd *cobra.Command) error {
 	} else {
 		format, err := output.ParseFormat(formatFlag)
 		if err != nil {
-			return &app.UsageError{Message: err.Error()}
+			if cmd.Name() == "graph" {
+				rt.format = output.FormatHuman
+			} else {
+				return &app.UsageError{Message: err.Error()}
+			}
+		} else {
+			rt.format = format
 		}
-		rt.format = format
 	}
 	color := rt.color
 	if noColor {

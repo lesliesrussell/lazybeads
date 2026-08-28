@@ -219,6 +219,161 @@ func renderDepList(w *output.Writer, id string, blockers, dependents []domain.De
 	}
 }
 
+func renderFocus(w *output.Writer, report *app.FocusReport, now time.Time) {
+	if !report.ActorConfigured {
+		w.Note("Actor is unconfigured. Set LB_ACTOR or --actor.")
+		w.Blank()
+	}
+	section := func(title string, issues []domain.Issue) {
+		w.Print(w.Heading(title))
+		if len(issues) == 0 {
+			w.Print("  none")
+			w.Blank()
+			return
+		}
+		idWidth := output.IDWidth(issues)
+		for _, i := range issues {
+			extra := output.Ago(i.UpdatedAt, now)
+			w.Print("  " + w.IssueLine(i, now, idWidth) + "  " + w.Style(output.StyleDim, extra))
+		}
+		w.Blank()
+	}
+	section("My active work", report.Active)
+	section("Recently touched", report.RecentlyTouched)
+	section("Recently unblocked", report.RecentlyUnblocked)
+	section("Needs attention", report.NeedsAttention)
+}
+
+func renderActivity(w *output.Writer, result *app.ActivityResult) {
+	if len(result.Events) == 0 {
+		w.Print("No recent activity.")
+		return
+	}
+	for _, ev := range result.Events {
+		id := ""
+		if ev.IssueID != nil {
+			id = *ev.IssueID + "  "
+		}
+		when := ev.Timestamp.UTC().Format("15:04")
+		if !ev.Timestamp.IsZero() {
+			when = output.RelativeTime(app.Now().Sub(ev.Timestamp))
+		}
+		w.Print(w.Style(output.StyleDim, when) + "  " + string(ev.Kind) + "  " + w.Style(output.StyleID, output.SanitizeLine(id)) + output.SanitizeLine(ev.Summary))
+	}
+}
+
+func renderDoctor(w *output.Writer, report *app.DoctorReport, verbose bool) {
+	w.Print(fmt.Sprintf("lazybeads %s · doctor", report.Version))
+	w.Print("Health: " + w.HealthSymbol(report.Health.Status) + " " + string(report.Health.Status))
+	w.Blank()
+	for _, c := range report.Health.Checks {
+		line := w.HealthSymbol(c.Level) + " " + c.Name + "  " + c.Summary
+		w.Print(line)
+		if verbose && c.Detail != "" {
+			w.Print("    " + c.Detail)
+		}
+		if c.Hint != "" {
+			w.Print("    " + w.Style(output.StyleDim, c.Hint))
+		}
+		for _, item := range c.Items {
+			w.Print("    - " + item)
+		}
+	}
+	if len(report.Fixes) > 0 {
+		w.Blank()
+		w.Print(w.Style(output.StyleBold, "Fixes"))
+		for _, f := range report.Fixes {
+			w.Print("  " + f)
+		}
+	}
+}
+
+func renderWhy(w *output.Writer, exp *app.Explanation) {
+	if exp.Ready {
+		w.Print(output.SanitizeLine(exp.IssueID) + " is ready.")
+		w.Blank()
+		w.Print("No open blockers were found.")
+		if exp.TransitiveUnlocks > 0 {
+			w.Print(fmt.Sprintf("It unlocks %d open task%s.", exp.TransitiveUnlocks, pluralNoun(exp.TransitiveUnlocks)))
+		}
+	} else if exp.Closed {
+		w.Print(output.SanitizeLine(exp.IssueID) + " is closed.")
+	} else {
+		w.Print(output.SanitizeLine(exp.IssueID) + " is blocked.")
+		w.Blank()
+		w.Print(w.Heading("Immediate blocker"))
+		if len(exp.ImmediateBlockers) == 0 {
+			w.Print("  none")
+		} else {
+			for _, b := range exp.ImmediateBlockers {
+				w.Print("  " + w.Style(output.StyleID, output.SanitizeLine(b.ID)) + " · " + output.SanitizeLine(b.Title))
+				w.Print("    Status: " + b.Status)
+			}
+		}
+		if len(exp.RootBlockers) > 0 {
+			w.Blank()
+			w.Print(w.Heading("Nearest currently actionable item"))
+			b := exp.RootBlockers[0]
+			w.Print("  " + w.Style(output.StyleID, output.SanitizeLine(b.ID)) + " · " + output.SanitizeLine(b.Title))
+		}
+	}
+	for _, warn := range exp.Warnings {
+		w.Warn(warn)
+	}
+}
+
+func renderGraphTree(w *output.Writer, g *domain.IssueGraph) {
+	root, ok := g.Nodes[g.RootID]
+	if !ok {
+		w.Print("empty graph")
+		return
+	}
+	w.Print(fmt.Sprintf("%s · %s [%s]", root.ID, output.SanitizeLine(root.Title), root.Status))
+	glyphs := w.Tree()
+	edges := g.OutEdges(g.RootID)
+	for i, e := range edges {
+		last := i == len(edges)-1
+		prefix := glyphs.Branch
+		if last {
+			prefix = glyphs.Last
+		}
+		node := g.Nodes[e.ToID]
+		w.Print(prefix + string(e.Type) + "  " + node.ID + " · " + output.SanitizeLine(node.Title) + " [" + string(node.Status) + "]")
+	}
+	if g.Truncated && g.Truncation != nil {
+		w.Note(g.Truncation.Reason)
+	}
+}
+
+func graphDOT(g *domain.IssueGraph) string {
+	var b strings.Builder
+	b.WriteString("digraph beads {\n")
+	for id, n := range g.Nodes {
+		fmt.Fprintf(&b, "  %q [label=%q];\n", id, n.ID+" "+n.Title)
+	}
+	for _, e := range g.Edges {
+		fmt.Fprintf(&b, "  %q -> %q [label=%q];\n", e.FromID, e.ToID, e.Type)
+	}
+	b.WriteString("}\n")
+	return b.String()
+}
+
+func renderBlocked(w *output.Writer, result *app.BlockedResult) {
+	w.Print(fmt.Sprintf("%s · %d %s", w.Heading("Blocked"), result.Total, map[bool]string{true: "task", false: "tasks"}[result.Total == 1]))
+	w.Blank()
+	if result.Total == 0 {
+		w.Print("No blocked work.")
+		return
+	}
+	for _, g := range result.Groups {
+		w.Print("Blocked by " + w.Style(output.StyleID, output.SanitizeLine(g.Blocker.ID)) + " — " + output.SanitizeLine(g.Blocker.Title))
+		for _, i := range g.Issues {
+			w.Print("  " + w.PriorityLabel(i.Priority) + " " + w.Style(output.StyleID, output.SanitizeLine(i.ID)) + "  " + output.SanitizeLine(i.Title))
+		}
+		w.Blank()
+	}
+}
+
 func renderDepValidate(w *output.Writer, report *app.DepReport) {
 	if report.CycleCount == 0 {
 		w.Print("No dependency cycles detected.")

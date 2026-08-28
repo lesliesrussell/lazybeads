@@ -263,3 +263,51 @@ func TestDepAddDryRunKeepsArgumentOrder(t *testing.T) {
 		t.Errorf("argv order lost in:\n%s", out)
 	}
 }
+
+func TestDoctorJSONHasHealth(t *testing.T) {
+	out, _, code := testCLI(t, fixtureCLI(t), "doctor", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d stdout=%s", code, out)
+	}
+	if !strings.Contains(out, `"health"`) {
+		t.Errorf("doctor json missing health:\n%s", out)
+	}
+}
+
+func TestFocusJSONListsActiveWork(t *testing.T) {
+	f := fixtureCLI(t)
+	_, err := f.Claim(context.Background(), "lb-1", beads.ClaimInput{Actor: "operator"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, _, code := testCLI(t, f, "focus", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d stdout=%s", code, out)
+	}
+	if !strings.Contains(out, `"lb-1"`) {
+		t.Errorf("focus json should include claimed lb-1:\n%s", out)
+	}
+}
+
+func TestWhyReadyIssue(t *testing.T) {
+	out, _, code := testCLI(t, fixtureCLI(t), "why", "lb-1")
+	if code != 0 {
+		t.Fatalf("exit %d stdout=%s", code, out)
+	}
+	if !strings.Contains(out, "ready") {
+		t.Errorf("why = %s", out)
+	}
+}
+
+func TestSyncNeverSaysCleanWithoutData(t *testing.T) {
+	out, _, code := testCLI(t, fixtureCLI(t), "sync", "status")
+	if code != 0 {
+		t.Fatalf("exit %d stdout=%s", code, out)
+	}
+	if strings.Contains(strings.ToLower(out), "clean") {
+		t.Errorf("must not invent clean sync: %s", out)
+	}
+	if !strings.Contains(strings.ToLower(out), "unknown") {
+		t.Errorf("expected unknown sync, got %s", out)
+	}
+}
