@@ -17,7 +17,7 @@ lb completion zsh    # print a completion script
 lb man | man -l -    # read the lb(1) page
 ```
 
-Requires a Beads CLI (`bd`) on `PATH`, or `LB_BD_BIN`.
+Requires a Beads CLI (`bd`) on `PATH`, or `LB_BD_BIN`. Tested against Beads 1.0.x; see [docs/compatibility.md](docs/compatibility.md).
 
 ## Quick start
 
@@ -32,6 +32,8 @@ lb close <id> --reason "done" --yes
 ```
 
 On a real terminal, `lb` with no arguments launches the TUI. Otherwise it prints help and exits 2.
+
+`lb doctor --fix` may write a user config file, create a cache directory, and install shell completion scripts. It never mutates Beads.
 
 ## Commands
 

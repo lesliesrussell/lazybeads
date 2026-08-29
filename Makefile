@@ -8,7 +8,7 @@ FISHCOMPDIR  ?= $(PREFIX)/share/fish/vendor_completions.d
 DESTDIR      ?=
 GO           ?= go
 
-.PHONY: all build install uninstall test clean help
+.PHONY: all build install uninstall test clean help release-check
 
 all: build
 
@@ -18,6 +18,7 @@ help:
 	@echo "  make install    copy lb, man page, and completions under $(PREFIX)"
 	@echo "  make uninstall  remove installed files"
 	@echo "  make test       go test ./..."
+	@echo "  make release-check  goreleaser check"
 	@echo "  make clean      remove bin/ and generated man/"
 
 build:
@@ -46,6 +47,10 @@ uninstall:
 
 test:
 	$(GO) test ./...
+
+# lb-uvj
+release-check:
+	goreleaser check
 
 clean:
 	rm -rf bin

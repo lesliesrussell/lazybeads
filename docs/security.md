@@ -12,7 +12,7 @@ LazyBeads treats issue text as hostile. Titles, descriptions, labels, events, an
 - **Bounds.** 30s timeout, 10 MiB stdout, 2 MiB stderr, graph depth 8 / 500 nodes.
 - **Debug traces** redact environment values.
 
-`lb doctor --fix` may only create local LazyBeads configuration. It does not upgrade Beads, push/pull Dolt, or change issues.
+`lb doctor --fix` may create local LazyBeads configuration, a cache directory, and optional shell completion scripts. It does not upgrade Beads, push/pull Dolt, or change issues.
 
 ## Exit codes
 

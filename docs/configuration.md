@@ -50,4 +50,4 @@ LB_BD_BIN  LB_CONFIG  LB_PROJECT  LB_BEADS_DIR  LB_RIG
 LB_ACTOR   LB_COLOR   LB_TIMEOUT  LB_NO_CONFIRM  LB_LOG_LEVEL
 ```
 
-`LB_NO_CONFIRM=1` is environment-only. Project config cannot silently disable confirmation. `lb doctor --fix` may write a user config file if one is missing; it never migrates Beads.
+`LB_NO_CONFIRM=1` is environment-only. Project config cannot silently disable confirmation. `lb doctor --fix` may write a user config file if one is missing, create the cache directory (`LB_CACHE_DIR`), and write completion scripts under the data directory (`LB_DATA_DIR`); it never migrates Beads.

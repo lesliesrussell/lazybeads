@@ -64,15 +64,28 @@ func (s *Service) Doctor(ctx context.Context, req DoctorRequest) (*DoctorReport,
 		}
 
 		if _, err := s.Client.List(ctx, beads.ListQuery{Scope: s.Scope(), Limit: 1}); err != nil {
-			h.Checks = append(h.Checks, domain.HealthCheck{
-				Name: "json_parse", Level: domain.HealthError,
-				Summary: "Beads JSON output could not be parsed",
-				Detail:  err.Error(),
-			})
+			if ce, ok := beads.AsCommandError(err); ok && ce.Kind == beads.ErrSchemaMismatch {
+				h.Checks = append(h.Checks, domain.HealthCheck{
+					Name: "schema", Level: domain.HealthError,
+					Summary: "Beads schema is incompatible with this LazyBeads",
+					Detail:  err.Error(),
+					Hint:    "Upgrade bd and follow Beads' own migration; LazyBeads will not run bd migrate.",
+				})
+			} else {
+				h.Checks = append(h.Checks, domain.HealthCheck{
+					Name: "json_parse", Level: domain.HealthError,
+					Summary: "Beads JSON output could not be parsed",
+					Detail:  err.Error(),
+				})
+			}
 		} else {
 			h.Checks = append(h.Checks, domain.HealthCheck{
 				Name: "json_parse", Level: domain.HealthOK,
 				Summary: "Beads JSON output decodes",
+			})
+			h.Checks = append(h.Checks, domain.HealthCheck{
+				Name: "schema", Level: domain.HealthOK,
+				Summary: "Beads schema is compatible (tested " + version.TestedBeads + ")",
 			})
 		}
 	} else {
@@ -165,6 +178,7 @@ func (s *Service) Doctor(ctx context.Context, req DoctorRequest) (*DoctorReport,
 				Items:   items,
 			})
 		}
+		s.checkParentStatus(ctx, h)
 		if sync, err := s.SyncInspect(ctx); err == nil {
 			summary := "Sync: unknown (LazyBeads could not determine remote status)"
 			if sync.Available {
@@ -191,6 +205,42 @@ func (s *Service) Doctor(ctx context.Context, req DoctorRequest) (*DoctorReport,
 	return report, nil
 }
 
+// lb-uvj
+func (s *Service) checkParentStatus(ctx context.Context, h *domain.Health) {
+	issues, err := s.Client.List(ctx, beads.ListQuery{Scope: s.Scope(), All: true})
+	if err != nil {
+		return
+	}
+	byID := make(map[string]domain.Issue, len(issues))
+	for _, i := range issues {
+		byID[i.ID] = i
+	}
+	var items []string
+	for _, i := range issues {
+		if i.ParentID != nil {
+			if parent, ok := byID[*i.ParentID]; ok && parent.IsClosed() && !i.IsClosed() {
+				items = append(items, i.ID+" is "+string(i.Status)+" under closed parent "+parent.ID)
+			}
+		}
+		if i.IsInProgress() && (i.Assignee == nil || i.Assignee.String() == "") {
+			items = append(items, i.ID+" is in_progress without an assignee")
+		}
+	}
+	if len(items) == 0 {
+		h.Checks = append(h.Checks, domain.HealthCheck{
+			Name: "parent_status", Level: domain.HealthOK,
+			Summary: "No parent/status inconsistencies",
+		})
+		return
+	}
+	h.Checks = append(h.Checks, domain.HealthCheck{
+		Name: "parent_status", Level: domain.HealthWarning,
+		Summary: fmt.Sprintf("%d parent/status issue(s)", len(items)),
+		Items:   items,
+		Hint:    "LazyBeads will not mutate these; inspect with lb show and fix through bd.",
+	})
+}
+
 func supportedBD(v string) bool {
 	v = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(v)), "v")
 	return strings.HasPrefix(v, "1.0.") || v == "1.0" || v == "1"
@@ -204,28 +254,41 @@ func truncate(s string, n int) string {
 	return s[:n] + "…"
 }
 
-// applyDoctorFixes writes a user config file if missing. It never touches Beads.
+// applyDoctorFixes writes a user config file if missing and creates the cache
+// directory. It never touches Beads.
 func applyDoctorFixes() ([]string, error) {
+	var fixes []string
 	path, err := config.UserConfigPath()
 	if err != nil {
 		return nil, err
 	}
 	if _, err := os.Stat(path); err == nil {
-		return []string{"config already exists at " + path}, nil
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return nil, err
-	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
-	if err != nil {
-		if os.IsExist(err) {
-			return []string{"config already exists at " + path}, nil
+		fixes = append(fixes, "config already exists at "+path)
+	} else {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return nil, err
 		}
-		return nil, err
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+		if err != nil {
+			if !os.IsExist(err) {
+				return nil, err
+			}
+			fixes = append(fixes, "config already exists at "+path)
+		} else {
+			defer f.Close()
+			if err := toml.NewEncoder(f).Encode(config.Default()); err != nil {
+				return nil, err
+			}
+			fixes = append(fixes, "wrote "+path)
+		}
 	}
-	defer f.Close()
-	if err := toml.NewEncoder(f).Encode(config.Default()); err != nil {
-		return nil, err
+	cache, err := config.UserCacheDir()
+	if err != nil {
+		return fixes, err
 	}
-	return []string{"wrote " + path}, nil
+	if err := os.MkdirAll(cache, 0o755); err != nil {
+		return fixes, err
+	}
+	fixes = append(fixes, "cache directory "+cache)
+	return fixes, nil
 }

@@ -280,6 +280,14 @@ func (rt *runtime) doctorCmd() *cobra.Command {
 				}}, report.Health.Checks...)
 				report.Health.Reduce()
 			}
+			if fix {
+				// lb-uvj
+				extra, ferr := writeUserCompletions(cmd.Root())
+				report.Fixes = append(report.Fixes, extra...)
+				if ferr != nil {
+					report.Fixes = append(report.Fixes, "completion: "+ferr.Error())
+				}
+			}
 			if rt.format != output.FormatHuman {
 				return rt.emit("doctor", report, nil)
 			}
@@ -287,7 +295,7 @@ func (rt *runtime) doctorCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&fix, "fix", false, "write a local LazyBeads config file if missing; never mutates Beads")
+	cmd.Flags().BoolVar(&fix, "fix", false, "write local config, cache dir, and shell completions; never mutates Beads")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "include check details")
 	return cmd
 }

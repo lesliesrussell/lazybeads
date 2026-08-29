@@ -42,6 +42,60 @@ func UserConfigPath() (string, error) {
 	return filepath.Join(home, ".config", "lazybeads", "config.toml"), nil
 }
 
+// lb-uvj
+func UserCacheDir() (string, error) {
+	if explicit := os.Getenv("LB_CACHE_DIR"); explicit != "" {
+		return explicit, nil
+	}
+	switch runtime.GOOS {
+	case "darwin":
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(home, "Library", "Caches", "lazybeads"), nil
+	case "windows":
+		if dir := os.Getenv("LOCALAPPDATA"); dir != "" {
+			return filepath.Join(dir, "lazybeads", "cache"), nil
+		}
+	}
+	if dir := os.Getenv("XDG_CACHE_HOME"); dir != "" {
+		return filepath.Join(dir, "lazybeads"), nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".cache", "lazybeads"), nil
+}
+
+// lb-uvj
+func UserDataDir() (string, error) {
+	if explicit := os.Getenv("LB_DATA_DIR"); explicit != "" {
+		return explicit, nil
+	}
+	switch runtime.GOOS {
+	case "darwin":
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(home, "Library", "Application Support", "lazybeads"), nil
+	case "windows":
+		if dir := os.Getenv("AppData"); dir != "" {
+			return filepath.Join(dir, "lazybeads"), nil
+		}
+	}
+	if dir := os.Getenv("XDG_DATA_HOME"); dir != "" {
+		return filepath.Join(dir, "lazybeads"), nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".local", "share", "lazybeads"), nil
+}
+
 // FindProjectConfig walks upward from dir looking for a project configuration
 // file, stopping at the filesystem root.
 func FindProjectConfig(dir string) string {

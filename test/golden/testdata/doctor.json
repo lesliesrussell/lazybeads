@@ -20,6 +20,11 @@
           "summary": "Beads JSON output decodes"
         },
         {
+          "name": "schema",
+          "level": "ok",
+          "summary": "Beads schema is compatible (tested 1.0.x)"
+        },
+        {
           "name": "workspace",
           "level": "ok",
           "summary": "Workspace /fake",
@@ -39,6 +44,11 @@
           "name": "editor",
           "level": "info",
           "summary": "No $VISUAL/$EDITOR set; `lb edit --open-in-editor` is unavailable"
+        },
+        {
+          "name": "parent_status",
+          "level": "ok",
+          "summary": "No parent/status inconsistencies"
         },
         {
           "name": "sync",

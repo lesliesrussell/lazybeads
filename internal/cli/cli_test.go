@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -302,6 +304,25 @@ func TestManPageWorksWithoutWorkspace(t *testing.T) {
 	}
 	if !strings.Contains(page, "lb") {
 		t.Fatalf("man page missing lb:\n%s", page)
+	}
+}
+
+func TestDoctorFixWritesCompletions(t *testing.T) {
+	// lb-uvj
+	tmp := t.TempDir()
+	t.Setenv("LB_CONFIG", filepath.Join(tmp, "config.toml"))
+	t.Setenv("LB_CACHE_DIR", filepath.Join(tmp, "cache"))
+	t.Setenv("LB_DATA_DIR", filepath.Join(tmp, "data"))
+	out, errOut, code := testCLI(t, fixtureCLI(t), "doctor", "--fix")
+	if code != 0 {
+		t.Fatalf("exit %d stderr=%s stdout=%s", code, errOut, out)
+	}
+	bash := filepath.Join(tmp, "data", "completions", "lb.bash")
+	if _, err := os.Stat(bash); err != nil {
+		t.Fatalf("completion script: %v\nstdout=%s", err, out)
+	}
+	if !strings.Contains(out, "Fixes") && !strings.Contains(out, "wrote") {
+		t.Errorf("expected fix report in:\n%s", out)
 	}
 }
 

@@ -3,6 +3,9 @@ package app
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -77,5 +80,59 @@ func TestDoctorWarnsWhenActorMissing(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("checks = %+v, want an actor warning", got.Health.Checks)
+	}
+}
+
+func TestDoctorFlagsOpenChildOfClosedParent(t *testing.T) {
+	// lb-uvj
+	f := newFakeClient()
+	closed := domain.StatusClosed
+	parent := "lb-epic"
+	f.add(domain.Issue{ID: parent, Title: "Epic", Status: closed, Type: domain.TypeEpic, Priority: 2})
+	f.add(domain.Issue{ID: "lb-child", Title: "Orphaned child", Status: domain.StatusOpen, Priority: 1, ParentID: &parent})
+	f.add(domain.Issue{ID: "lb-loose", Title: "Claimed without owner", Status: domain.StatusInProgress, Priority: 1})
+	got, err := newTestService(f).Doctor(context.Background(), DoctorRequest{})
+	if err != nil {
+		t.Fatalf("Doctor: %v", err)
+	}
+	var check *domain.HealthCheck
+	for i := range got.Health.Checks {
+		if got.Health.Checks[i].Name == "parent_status" {
+			check = &got.Health.Checks[i]
+			break
+		}
+	}
+	if check == nil {
+		t.Fatalf("missing parent_status check: %+v", got.Health.Checks)
+	}
+	if check.Level != domain.HealthWarning {
+		t.Errorf("level = %s, want warning", check.Level)
+	}
+	joined := strings.Join(check.Items, "\n")
+	if !strings.Contains(joined, "lb-child") || !strings.Contains(joined, "lb-epic") {
+		t.Errorf("items = %v, want closed-parent child", check.Items)
+	}
+	if !strings.Contains(joined, "lb-loose") {
+		t.Errorf("items = %v, want unclaimed in_progress", check.Items)
+	}
+}
+
+func TestDoctorFixCreatesCache(t *testing.T) {
+	// lb-uvj
+	tmp := t.TempDir()
+	t.Setenv("LB_CONFIG", filepath.Join(tmp, "cfg", "config.toml"))
+	t.Setenv("LB_CACHE_DIR", filepath.Join(tmp, "cache"))
+	got, err := newTestService(newFakeClient()).Doctor(context.Background(), DoctorRequest{Fix: true})
+	if err != nil {
+		t.Fatalf("Doctor --fix: %v", err)
+	}
+	if len(got.Fixes) == 0 {
+		t.Fatal("expected fixes")
+	}
+	if _, err := os.Stat(filepath.Join(tmp, "cache")); err != nil {
+		t.Fatalf("cache dir: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(tmp, "cfg", "config.toml")); err != nil {
+		t.Fatalf("config: %v", err)
 	}
 }

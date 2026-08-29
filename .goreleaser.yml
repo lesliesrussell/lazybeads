@@ -1,4 +1,4 @@
-# lb-17y
+# lb-uvj
 version: 2
 project_name: lazybeads
 builds:
@@ -9,6 +9,8 @@ builds:
       - CGO_ENABLED=0
     goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X github.com/lesliesrussell/lazybeads/internal/version.Version={{.Version}}
 archives:
   - formats: [tar.gz]
     format_overrides:
@@ -16,3 +18,10 @@ archives:
         formats: [zip]
 checksum:
   name_template: checksums.txt
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
