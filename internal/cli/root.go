@@ -87,7 +87,7 @@ func (rt *runtime) root() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if cmd.Name() == "version" || cmd.Name() == "help" {
+			if skipWorkspaceSetup(cmd) {
 				return nil
 			}
 			err := rt.setup(cmd)
@@ -154,6 +154,7 @@ func (rt *runtime) root() *cobra.Command {
 	cmd.AddCommand(rt.graphCmd())
 	cmd.AddCommand(rt.blockedCmd())
 	cmd.AddCommand(rt.tuiCmd())
+	cmd.AddCommand(rt.manCmd())
 	cmd.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print the LazyBeads version",
@@ -163,6 +164,21 @@ func (rt *runtime) root() *cobra.Command {
 		},
 	})
 	return cmd
+}
+
+// lb-wlu
+func skipWorkspaceSetup(cmd *cobra.Command) bool {
+	for c := cmd; c != nil; c = c.Parent() {
+		switch c.Name() {
+		case "version", "help", "completion", "man":
+			return true
+		}
+	}
+	switch cmd.Name() {
+	case cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
+		return true
+	}
+	return false
 }
 
 func (rt *runtime) setup(cmd *cobra.Command) error {

@@ -6,10 +6,15 @@ The terminal operator console for [Beads](https://github.com/gastownhall/beads).
 
 ```sh
 make                 # bin/lb
-make install         # /usr/local/bin/lb (may need sudo)
+make install         # /usr/local/bin/lb plus man page and shell completions
 make install PREFIX=$HOME/.local
 # or:
 go install github.com/lesliesrussell/lazybeads/cmd/lb@latest
+```
+
+```sh
+lb completion zsh    # print a completion script
+lb man | man -l -    # read the lb(1) page
 ```
 
 Requires a Beads CLI (`bd`) on `PATH`, or `LB_BD_BIN`.

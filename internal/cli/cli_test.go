@@ -264,6 +264,47 @@ func TestDepAddDryRunKeepsArgumentOrder(t *testing.T) {
 	}
 }
 
+func TestCompletionBashWorksWithoutWorkspace(t *testing.T) {
+	// lb-wlu
+	missing := t.TempDir()
+	var out, errOut bytes.Buffer
+	code := Execute(Options{
+		Stdout: &out,
+		Stderr: &errOut,
+		Stdin:  bytes.NewReader(nil),
+		Args:   []string{"--project", missing, "completion", "bash"},
+	})
+	if code != 0 {
+		t.Fatalf("exit %d stderr=%s stdout=%s", code, errOut.String(), out.String())
+	}
+	script := out.String()
+	if !strings.Contains(script, "lb") || (!strings.Contains(script, "complete") && !strings.Contains(script, "COMPREPLY")) {
+		t.Fatalf("expected a bash completion script, got:\n%s", script)
+	}
+}
+
+func TestManPageWorksWithoutWorkspace(t *testing.T) {
+	// lb-wlu
+	missing := t.TempDir()
+	var out, errOut bytes.Buffer
+	code := Execute(Options{
+		Stdout: &out,
+		Stderr: &errOut,
+		Stdin:  bytes.NewReader(nil),
+		Args:   []string{"--project", missing, "man"},
+	})
+	if code != 0 {
+		t.Fatalf("exit %d stderr=%s stdout=%s", code, errOut.String(), out.String())
+	}
+	page := out.String()
+	if !strings.Contains(page, ".SH NAME") {
+		t.Fatalf("man page missing NAME section:\n%s", page)
+	}
+	if !strings.Contains(page, "lb") {
+		t.Fatalf("man page missing lb:\n%s", page)
+	}
+}
+
 func TestDoctorJSONHasHealth(t *testing.T) {
 	out, _, code := testCLI(t, fixtureCLI(t), "doctor", "--json")
 	if code != 0 {
