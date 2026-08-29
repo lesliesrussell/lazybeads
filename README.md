@@ -5,9 +5,11 @@ The terminal operator console for [Beads](https://github.com/gastownhall/beads).
 `bd` is the database, graph, and atomic coordination layer. `lb` is attention management: rank, explain, navigate, and mutate through `bd` only — never by writing `.beads/` itself.
 
 ```sh
+make                 # bin/lb
+make install         # /usr/local/bin/lb (may need sudo)
+make install PREFIX=$HOME/.local
+# or:
 go install github.com/lesliesrussell/lazybeads/cmd/lb@latest
-# or, from this repo:
-go build -o lb ./cmd/lb
 ```
 
 Requires a Beads CLI (`bd`) on `PATH`, or `LB_BD_BIN`.

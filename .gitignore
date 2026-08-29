@@ -1,4 +1,6 @@
 /lb
+# lb-98h
+/bin/
 /dist/
 *.test
 .beads/embeddeddolt/
