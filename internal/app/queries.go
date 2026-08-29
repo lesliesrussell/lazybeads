@@ -484,6 +484,12 @@ func (s *Service) List(ctx context.Context, req ListRequest) (*ListResult, error
 	if err != nil {
 		return nil, err
 	}
+	if req.Status == "" {
+		if status, query := ParseListFilter(req.Query); status != "" {
+			req.Status = status
+			req.Query = query
+		}
+	}
 	q := beads.ListQuery{
 		Scope:         s.Scope(),
 		Status:        req.Status,
@@ -571,7 +577,46 @@ func parseFlexibleTime(s string) (time.Time, bool) {
 	return time.Time{}, false
 }
 
+// ParseListFilter splits a free-text filter into a status constraint and a
+// remaining query. Bare tokens like "closed" or "status:open" are status
+// filters; anything else is full-text.
+func ParseListFilter(raw string) (status, query string) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", ""
+	}
+	if status, ok := cutStatusFilter(raw); ok {
+		return status, ""
+	}
+	return "", raw
+}
+
+func cutStatusFilter(q string) (string, bool) {
+	q = strings.ToLower(strings.TrimSpace(q))
+	for _, prefix := range []string{"status:", "is:"} {
+		if rest, ok := strings.CutPrefix(q, prefix); ok {
+			return normalizeStatusToken(rest), true
+		}
+	}
+	switch normalizeStatusToken(q) {
+	case "open", "closed", "in_progress", "blocked", "deferred":
+		return normalizeStatusToken(q), true
+	}
+	return "", false
+}
+
+func normalizeStatusToken(s string) string {
+	return strings.ReplaceAll(strings.TrimSpace(strings.ToLower(s)), "-", "_")
+}
+
 func matchesQuery(issue domain.Issue, q string) bool {
+	// lb-ank
+	if status, ok := cutStatusFilter(q); ok {
+		return strings.EqualFold(string(issue.Status), status)
+	}
+	if strings.Contains(strings.ToLower(string(issue.Status)), q) {
+		return true
+	}
 	if strings.Contains(strings.ToLower(issue.ID), q) {
 		return true
 	}
@@ -619,11 +664,17 @@ func (s *Service) Search(ctx context.Context, req SearchRequest) (*SearchResult,
 	if limit <= 0 {
 		limit = defaultSearchLimit
 	}
+	status, text := ParseListFilter(query)
+	all := req.All
+	if status != "" {
+		all = true
+	}
 
 	candidates, err := s.Client.List(ctx, beads.ListQuery{
-		Scope: s.Scope(),
-		All:   req.All,
-		Limit: maxSearchCandidates,
+		Scope:  s.Scope(),
+		Status: status,
+		All:    all,
+		Limit:  maxSearchCandidates,
 	})
 	if err != nil {
 		return nil, err
@@ -633,9 +684,13 @@ func (s *Service) Search(ctx context.Context, req SearchRequest) (*SearchResult,
 		issue domain.Issue
 		score int
 	}
-	q := strings.ToLower(query)
+	q := strings.ToLower(text)
 	var hits []ranked
 	for _, issue := range candidates {
+		if status != "" {
+			hits = append(hits, ranked{issue: issue, score: 800})
+			continue
+		}
 		score, ok := searchScore(issue, q)
 		if !ok {
 			continue

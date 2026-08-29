@@ -21,6 +21,7 @@ func testModel(t *testing.T) (Model, *app.MemClient) {
 	f := app.NewMemClient()
 	f.Add(domain.Issue{ID: "lb-1", Title: "Add typed bd adapter", Priority: 1, Type: domain.TypeTask})
 	f.Add(domain.Issue{ID: "lb-2", Title: "Implement lb status", Priority: 1, Type: domain.TypeTask})
+	f.Add(domain.Issue{ID: "lb-3", Title: "Shipped foundation", Priority: 2, Type: domain.TypeTask, Status: domain.StatusClosed})
 	f.Dep("lb-2", "lb-1")
 	svc := app.NewService(f, config.Default(), workspace.Workspace{
 		RootPath: "/fake", BeadsDir: "/fake/.beads", BDVersion: "1.0.5",
@@ -200,6 +201,42 @@ func stripANSI(s string) string {
 		b.WriteRune(r)
 	}
 	return b.String()
+}
+
+func TestIssuesViewMarksClosedAndFiltersStatus(t *testing.T) {
+	// lb-ank
+	m, _ := testModel(t)
+	m.opts.ASCII = true
+	m = pump(m, m.Init())
+	nm, cmd := m.Update(key("i"))
+	m = pump(nm.(Model), cmd)
+	view := stripANSI(m.View())
+	if !strings.Contains(view, "closed") || !strings.Contains(view, "lb-3") {
+		t.Fatalf("issues view must show closed status on the row:\n%s", view)
+	}
+	if !strings.Contains(view, "+ closed") && !strings.Contains(view, "closed") {
+		t.Fatalf("closed glyph+label missing:\n%s", view)
+	}
+
+	m.filter = "closed"
+	m = pump(m, m.loadView())
+	filtered := stripANSI(m.View())
+	if !strings.Contains(filtered, "lb-3") {
+		t.Fatalf("/closed must keep closed issues:\n%s", filtered)
+	}
+	if strings.Contains(filtered, "lb-1") {
+		t.Fatalf("/closed must hide open issues:\n%s", filtered)
+	}
+
+	m.filter = "status:open"
+	m = pump(m, m.loadView())
+	openOnly := stripANSI(m.View())
+	if strings.Contains(openOnly, "lb-3") {
+		t.Fatalf("status:open leaked closed issue:\n%s", openOnly)
+	}
+	if !strings.Contains(openOnly, "lb-1") {
+		t.Fatalf("status:open missing open issue:\n%s", openOnly)
+	}
 }
 
 func TestNarrowLayoutHidesPreview(t *testing.T) {

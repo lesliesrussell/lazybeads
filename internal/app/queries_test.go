@@ -328,6 +328,23 @@ func TestListANDLabelsExcludeClosedAndHonorQuery(t *testing.T) {
 	if len(queried.Issues) != 1 || queried.Issues[0].ID != "lb-a" {
 		t.Errorf("query = %v, want [lb-a]", issueIDs(queried.Issues))
 	}
+
+	byStatus, err := svc.List(context.Background(), ListRequest{Query: "closed"})
+	if err != nil {
+		t.Fatalf("List query closed: %v", err)
+	}
+	if len(byStatus.Issues) != 1 || byStatus.Issues[0].ID != "lb-c" {
+		t.Errorf("query closed = %v, want [lb-c]", issueIDs(byStatus.Issues))
+	}
+	prefixed, err := svc.List(context.Background(), ListRequest{Query: "status:open", All: true})
+	if err != nil {
+		t.Fatalf("List status:open: %v", err)
+	}
+	for _, i := range prefixed.Issues {
+		if i.IsClosed() {
+			t.Errorf("status:open leaked closed %s", i.ID)
+		}
+	}
 }
 
 func TestListAssigneeMeRequiresActor(t *testing.T) {

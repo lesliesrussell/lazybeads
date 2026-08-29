@@ -15,7 +15,7 @@ The TUI is a lazygit-style tiled console: stats header, context tabs, a list pan
 | `r` `f` `b` `i` `a` `m` `h` | Ready, focus, blocked, issues, activity, memory, health |
 | `g` | Graph for the selected issue |
 | `c` / `u` / `x` / `n` | Claim / unclaim / close / create (always confirm) |
-| `/` | Filter |
+| `/` | Filter (bare `closed` / `open` / `status:in_progress`) |
 | `:` | Command palette |
 | `R` | Refresh |
 | `?` | Help |

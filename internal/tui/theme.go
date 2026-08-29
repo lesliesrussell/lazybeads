@@ -3,10 +3,12 @@ package tui
 
 import (
 	"bytes"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 
+	"github.com/lesliesrussell/lazybeads/internal/domain"
 	"github.com/lesliesrussell/lazybeads/internal/output"
 )
 
@@ -113,6 +115,26 @@ func (th theme) glyph(sym output.Symbol) string {
 		output.SymClosed: "✓", output.SymBlocked: "⊘", output.SymInProgress: "◐",
 		output.SymBullet: "·", output.SymArrow: "→",
 	}[sym]
+}
+
+func (th theme) statusCell(st domain.IssueStatus) string {
+	// lb-ank
+	text := string(st)
+	if text == "" {
+		text = "open"
+	}
+	sym := output.SymBullet
+	switch {
+	case strings.EqualFold(text, string(domain.StatusClosed)):
+		sym = output.SymClosed
+	case strings.EqualFold(text, string(domain.StatusInProgress)):
+		sym = output.SymInProgress
+	case strings.EqualFold(text, string(domain.StatusBlocked)):
+		sym = output.SymBlocked
+	case strings.EqualFold(text, string(domain.StatusOpen)):
+		sym = output.SymReady
+	}
+	return th.glyph(sym) + " " + text
 }
 
 func (th theme) prio(p int) lipgloss.Style {

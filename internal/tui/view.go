@@ -253,12 +253,27 @@ func (m Model) renderList(th theme, width, height int) string {
 		}
 		id := output.Pad(output.SanitizeLine(r.ID), idw)
 		title := output.SanitizeLine(r.Title)
-		rest := prio + "  " + id + "  " + title
-		if r.Meta != "" {
-			rest += "  " + output.SanitizeLine(r.Meta)
+		// lb-ank
+		prefix := prio + "  " + id + "  "
+		if r.Issue.ID != "" {
+			prefix += output.Pad(th.statusCell(r.Issue.Status), 14) + "  "
 		}
-		if width > 2 {
-			rest = output.Truncate(rest, width-2)
+		extra := ""
+		if r.Meta != "" && (r.Issue.ID == "" || !strings.Contains(strings.ToLower(r.Meta), strings.ToLower(string(r.Issue.Status)))) {
+			extra = "  " + output.SanitizeLine(r.Meta)
+		}
+		inner := width - 2
+		if inner < 8 {
+			inner = 8
+		}
+		titleW := inner - output.Width(prefix) - output.Width(extra)
+		if titleW < 4 {
+			titleW = 4
+		}
+		title = output.Truncate(title, titleW)
+		rest := prefix + title + extra
+		if output.Width(rest) > inner {
+			rest = output.Truncate(rest, inner)
 		}
 		caret := "❯ "
 		if th.ascii {
@@ -266,6 +281,8 @@ func (m Model) renderList(th theme, width, height int) string {
 		}
 		if i == m.cursor {
 			b.WriteString(th.selected.Width(width).Render(caret + rest))
+		} else if r.Issue.IsClosed() {
+			b.WriteString(th.dim.Width(width).Render("  " + rest))
 		} else {
 			b.WriteString("  " + rest)
 		}
@@ -412,7 +429,7 @@ func (m Model) renderHelp(th theme) string {
 		"  " + th.key.Render("c") + "  claim          " + th.key.Render("x") + "  close",
 		"  " + th.key.Render("u") + "  unclaim        " + th.key.Render("n") + "  create",
 		"  " + th.key.Render("r/f/b/i/a/m/h") + "  switch view",
-		"  " + th.key.Render("/") + "  filter         " + th.key.Render(":") + "  command",
+		"  " + th.key.Render("/") + "  filter (closed, status:open)   " + th.key.Render(":") + "  command",
 		"  " + th.key.Render("R") + "  refresh        " + th.key.Render("?") + "  help",
 		"  " + th.key.Render("y") + "  copy id        " + th.key.Render("q") + "  back / quit",
 		"",

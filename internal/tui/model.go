@@ -327,10 +327,18 @@ func (m Model) visibleRows() []listRow {
 	if m.filter == "" {
 		return m.rows
 	}
-	q := strings.ToLower(m.filter)
+	status, query := app.ParseListFilter(m.filter)
+	q := strings.ToLower(query)
 	var out []listRow
 	for _, r := range m.rows {
-		if strings.Contains(strings.ToLower(r.ID), q) || strings.Contains(strings.ToLower(r.Title), q) || strings.Contains(strings.ToLower(r.Meta), q) {
+		if status != "" && !strings.EqualFold(string(r.Issue.Status), status) {
+			continue
+		}
+		if q == "" {
+			out = append(out, r)
+			continue
+		}
+		if strings.Contains(strings.ToLower(r.ID), q) || strings.Contains(strings.ToLower(r.Title), q) || strings.Contains(strings.ToLower(r.Meta), q) || strings.Contains(strings.ToLower(string(r.Issue.Status)), q) {
 			out = append(out, r)
 		}
 	}
