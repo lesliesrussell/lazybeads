@@ -6,3 +6,4 @@
 .beads/embeddeddolt/
 .beads/*.db
 .omc/state/
+.DS_Store
