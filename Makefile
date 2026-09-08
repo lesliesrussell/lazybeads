@@ -1,5 +1,8 @@
 # lb-98h
-PREFIX       ?= /usr/local
+# lb-m3o: default to the per-user prefix. It needs no sudo and ~/.local/bin is
+# what the shell actually resolves lb to; PREFIX=/usr/local still works for a
+# system-wide install.
+PREFIX       ?= $(HOME)/.local
 BINDIR       ?= $(PREFIX)/bin
 MANDIR       ?= $(PREFIX)/share/man/man1
 BASHCOMPDIR  ?= $(PREFIX)/share/bash-completion/completions
@@ -16,6 +19,7 @@ help:
 	@echo "Targets:"
 	@echo "  make build      compile bin/lb"
 	@echo "  make install    copy lb, man page, and completions under $(PREFIX)"
+	@echo "                  override with: make install PREFIX=/usr/local (needs sudo)"
 	@echo "  make uninstall  remove installed files"
 	@echo "  make test       go test ./..."
 	@echo "  make release-check  goreleaser check"

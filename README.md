@@ -6,8 +6,8 @@ The terminal operator console for [Beads](https://github.com/gastownhall/beads).
 
 ```sh
 make                 # bin/lb
-make install         # /usr/local/bin/lb plus man page and shell completions
-make install PREFIX=$HOME/.local
+make install         # ~/.local/bin/lb plus man page and shell completions
+make install PREFIX=/usr/local   # system-wide; needs sudo
 # or:
 go install github.com/lesliesrussell/lazybeads/cmd/lb@latest
 ```
