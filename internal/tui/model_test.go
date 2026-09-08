@@ -3,6 +3,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -246,5 +247,91 @@ func TestNarrowLayoutHidesPreview(t *testing.T) {
 	view := m.View()
 	if strings.Contains(view, "Preview") {
 		t.Fatalf("narrow layout should be a single pane:\n%s", view)
+	}
+}
+
+// lb-aio
+func longIssue(id string) domain.Issue {
+	var b strings.Builder
+	for i := 1; i <= 60; i++ {
+		fmt.Fprintf(&b, "body line %02d\n", i)
+	}
+	b.WriteString("TAILMARK")
+	return domain.Issue{ID: id, Title: "Very long issue", Priority: 1, Type: domain.TypeTask, Description: b.String()}
+}
+
+func TestDetailViewScrollsToContentBelowTheFold(t *testing.T) {
+	m, f := testModel(t)
+	f.Add(longIssue("lb-9"))
+	m.opts.ASCII = true
+	m.view = viewDetail
+	m.selectedID = "lb-9"
+	m = pump(m, m.loadView())
+
+	first := stripANSI(m.View())
+	if strings.Contains(first, "TAILMARK") {
+		t.Fatalf("test issue is not taller than the pane:\n%s", first)
+	}
+	if !strings.Contains(first, "body line 01") {
+		t.Fatalf("detail should start at the top:\n%s", first)
+	}
+
+	nm, _ := m.Update(key("G"))
+	m = nm.(Model)
+	bottom := stripANSI(m.View())
+	if !strings.Contains(bottom, "TAILMARK") {
+		t.Fatalf("G must reach the end of the detail body:\n%s", bottom)
+	}
+
+	nm, _ = m.Update(key("G"))
+	m = nm.(Model)
+	if again := stripANSI(m.View()); again != bottom {
+		t.Errorf("scroll ran past the end of the content")
+	}
+
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyHome})
+	m = nm.(Model)
+	if top := stripANSI(m.View()); !strings.Contains(top, "body line 01") || strings.Contains(top, "TAILMARK") {
+		t.Errorf("home must return to the top of the body:\n%s", top)
+	}
+}
+
+func TestPreviewPaneScrollsWhenFocused(t *testing.T) {
+	m, f := testModel(t)
+	f.Add(longIssue("lb-9"))
+	m.opts.ASCII = true
+	m = pump(m, m.Init())
+	nm, cmd := m.Update(key("i"))
+	m = pump(nm.(Model), cmd)
+	for i, r := range m.visibleRows() {
+		if r.ID == "lb-9" {
+			m.cursor = i
+		}
+	}
+	m = pump(m, m.previewCmd())
+	if !m.wide() {
+		t.Fatal("test frame should be wide enough for a preview pane")
+	}
+
+	nm, _ = m.Update(key("j"))
+	if nm.(Model).scroll != 0 {
+		t.Fatal("j in the list pane must move the cursor, not scroll the preview")
+	}
+
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = nm.(Model)
+	if m.pane != 1 {
+		t.Fatalf("tab should focus the preview pane, got pane %d", m.pane)
+	}
+	if strings.Contains(stripANSI(m.View()), "TAILMARK") {
+		t.Fatal("preview should start clipped for a long issue")
+	}
+	nm, _ = m.Update(key("G"))
+	m = nm.(Model)
+	if m.scroll == 0 {
+		t.Fatal("G in the preview pane must scroll it")
+	}
+	if !strings.Contains(stripANSI(m.View()), "TAILMARK") {
+		t.Fatalf("preview scroll never reached the tail:\n%s", m.View())
 	}
 }

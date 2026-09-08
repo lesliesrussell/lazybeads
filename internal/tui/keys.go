@@ -26,10 +26,18 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleNavKey(k string) (tea.Model, tea.Cmd) {
+	// lb-aio: when a content pane has focus, movement scrolls it instead of
+	// moving the list cursor — otherwise anything past the last row is lost.
+	if m.scrollsContent() {
+		if handled, mm := m.scrollKey(k); handled {
+			return mm, nil
+		}
+	}
 	switch k {
 	case "q":
 		if m.view == viewDetail || m.view == viewGraph || m.view == viewHelp {
 			m.view = m.prevView
+			m.scroll = 0
 			return m, m.loadView()
 		}
 		return m, tea.Quit
@@ -41,29 +49,36 @@ func (m Model) handleNavKey(k string) (tea.Model, tea.Cmd) {
 		}
 		if m.view == viewDetail || m.view == viewGraph || m.view == viewHelp {
 			m.view = m.prevView
+			m.scroll = 0
 			return m, m.loadView()
 		}
 		return m, nil
 	case "j", "down":
 		m.cursor++
 		m.clampCursor()
+		m.scroll = 0
 		return m, m.previewCmd()
 	case "k", "up":
 		m.cursor--
 		m.clampCursor()
+		m.scroll = 0
 		return m, m.previewCmd()
-	case "ctrl+d":
+	case "ctrl+d", "pgdown":
 		m.cursor += 10
 		m.clampCursor()
-	case "ctrl+u":
+		m.scroll = 0
+	case "ctrl+u", "pgup":
 		m.cursor -= 10
 		m.clampCursor()
-	case "G":
+		m.scroll = 0
+	case "G", "end":
 		if n := len(m.visibleRows()); n > 0 {
 			m.cursor = n - 1
 		}
+		m.scroll = 0
 	case "home":
 		m.cursor = 0
+		m.scroll = 0
 	case "r":
 		return m.switchView(viewReady)
 	case "f":
@@ -88,6 +103,7 @@ func (m Model) handleNavKey(k string) (tea.Model, tea.Cmd) {
 		m.prevView = m.view
 		m.view = viewGraph
 		m.loading = true
+		m.scroll = 0
 		return m, m.loadView()
 	case "enter":
 		row, ok := m.currentRow()
@@ -98,6 +114,7 @@ func (m Model) handleNavKey(k string) (tea.Model, tea.Cmd) {
 		m.prevView = m.view
 		m.view = viewDetail
 		m.loading = true
+		m.scroll = 0
 		return m, m.loadView()
 	case "c":
 		return m.beginConfirm("claim")
@@ -129,6 +146,7 @@ func (m Model) handleNavKey(k string) (tea.Model, tea.Cmd) {
 	case "tab":
 		if m.wide() {
 			m.pane = 1 - m.pane
+			m.clampScroll()
 		}
 		return m, nil
 	case "y":
@@ -152,9 +170,39 @@ func (m Model) handleNavKey(k string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// lb-aio
+// scrollKey moves the content pane's viewport. It reports false for keys it
+// does not own so the normal navigation switch still sees them.
+func (m Model) scrollKey(k string) (bool, Model) {
+	_, viewport := m.contentExtent()
+	page := viewport - 1
+	if page < 1 {
+		page = 1
+	}
+	switch k {
+	case "j", "down":
+		m.scroll++
+	case "k", "up":
+		m.scroll--
+	case "ctrl+d", "pgdown", " ":
+		m.scroll += page
+	case "ctrl+u", "pgup":
+		m.scroll -= page
+	case "G", "end":
+		m.scroll = 1 << 30
+	case "home":
+		m.scroll = 0
+	default:
+		return false, m
+	}
+	m.clampScroll()
+	return true, m
+}
+
 func (m Model) switchView(v viewKind) (tea.Model, tea.Cmd) {
 	m.view = v
 	m.cursor = 0
+	m.scroll = 0
 	m.overlay = overlayNone
 	m.loading = true
 	m.err = nil

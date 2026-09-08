@@ -86,6 +86,7 @@ type Model struct {
 	copied      string
 	lastRefresh time.Time
 	pane        int // 0 list, 1 preview — lazygit-style focused panel
+	scroll      int // lb-aio: vertical offset of the focused content pane
 }
 
 type listRow struct {
@@ -275,6 +276,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.previewCmd()
 	case showMsg:
 		m.loading = false
+		if m.detail == nil || m.detail.Detail.ID != msg.res.Detail.ID {
+			m.scroll = 0 // lb-aio
+		}
 		m.detail = msg.res
 		m.selectedID = msg.res.Detail.ID
 	case graphMsg:

@@ -16,12 +16,7 @@ import (
 // panel beside a live preview, and a keybinding status bar. Overlays sit in
 // a centered modal. Status is never colour-only.
 func (m Model) View() string {
-	if m.width < 40 {
-		m.width = 80
-	}
-	if m.height < 12 {
-		m.height = 24
-	}
+	m = m.normalized()
 	th := newTheme(m.opts)
 	base := m.renderChrome(th)
 	switch m.overlay {
@@ -42,12 +37,46 @@ func (m Model) renderChrome(th theme) string {
 	header := th.header.Width(m.width).Render(m.headerLine())
 	tabs := m.renderTabs(th)
 	footer := th.statusBar.Width(m.width).Render(m.footerLine(th))
-	bodyH := m.height - lipgloss.Height(header) - lipgloss.Height(tabs) - lipgloss.Height(footer)
-	if bodyH < 5 {
-		bodyH = 5
-	}
-	body := m.renderBody(th, bodyH)
+	body := m.renderBody(th, m.bodyHeight(th))
 	return lipgloss.JoinVertical(lipgloss.Left, header, tabs, body, footer)
+}
+
+// lb-aio
+// normalized clamps the frame to a sane minimum so every renderer and the
+// scroll arithmetic in contentExtent agree on the same dimensions.
+func (m Model) normalized() Model {
+	if m.width < 40 {
+		m.width = 80
+	}
+	if m.height < 12 {
+		m.height = 24
+	}
+	return m
+}
+
+// bodyHeight is the row budget left for the body panels once the header,
+// tabs and status bar have taken their share.
+func (m Model) bodyHeight(th theme) int {
+	h := m.height -
+		lipgloss.Height(th.header.Width(m.width).Render(m.headerLine())) -
+		lipgloss.Height(m.renderTabs(th)) -
+		lipgloss.Height(th.statusBar.Width(m.width).Render(m.footerLine(th)))
+	if h < 5 {
+		h = 5
+	}
+	return h
+}
+
+// paneWidths splits the frame between the list and the preview.
+func (m Model) paneWidths() (left, right int) {
+	left = m.width * 2 / 5
+	if left < 36 {
+		left = 36
+	}
+	if left > m.width-40 {
+		left = m.width / 2
+	}
+	return left, m.width - left
 }
 
 func (m Model) headerLine() string {
@@ -101,29 +130,121 @@ func (m Model) renderTabs(th theme) string {
 }
 
 func (m Model) renderBody(th theme, height int) string {
+	// lb-aio: full-frame content panes scroll rather than dropping the tail.
 	if m.view == viewDetail {
-		return m.panel(th, "Issue", m.renderDetail(th, m.width-2), m.width, height, true)
+		return m.scrolledPanel(th, "Issue", m.renderDetail(th, m.width-2), m.width, height, true)
 	}
 	if m.view == viewGraph {
-		return m.panel(th, "Graph", m.renderGraph(th), m.width, height, true)
+		return m.scrolledPanel(th, "Graph", m.renderGraph(th), m.width, height, true)
 	}
 	if m.view == viewHealth {
-		return m.panel(th, "Health", m.renderHealth(th), m.width, height, true)
+		return m.scrolledPanel(th, "Health", m.renderHealth(th), m.width, height, true)
 	}
 	if m.wide() {
-		leftW := m.width * 2 / 5
-		if leftW < 36 {
-			leftW = 36
-		}
-		if leftW > m.width-40 {
-			leftW = m.width / 2
-		}
-		rightW := m.width - leftW
+		leftW, rightW := m.paneWidths()
 		left := m.panel(th, m.viewTitle(), m.renderList(th, leftW-2, height-2), leftW, height, m.pane == 0)
-		right := m.panel(th, "Preview", m.renderPreview(th, rightW-2), rightW, height, m.pane == 1)
+		right := m.scrolledPanel(th, "Preview", m.renderPreview(th, rightW-2), rightW, height, m.pane == 1)
 		return lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 	}
 	return m.panel(th, m.viewTitle(), m.renderList(th, m.width-2, height-2), m.width, height, true)
+}
+
+// lb-aio
+// scrolledPanel draws a content pane through the model's scroll offset and
+// advertises the visible window in the panel title, so a reader can tell
+// there is more below and how far down they are.
+func (m Model) scrolledPanel(th theme, title, content string, width, height int, focused bool) string {
+	view, label := clipScroll(content, m.scroll, height-2)
+	if label != "" {
+		title += " · " + label
+	}
+	return m.panel(th, title, view, width, height, focused)
+}
+
+// lb-aio
+// clipScroll windows content at offset, returning the visible lines and a
+// "first-last/total" label (empty when everything already fits).
+func clipScroll(content string, offset, height int) (string, string) {
+	if height < 1 {
+		height = 1
+	}
+	lines := contentLines(content)
+	if len(lines) <= height {
+		return content, ""
+	}
+	if maxOff := len(lines) - height; offset > maxOff {
+		offset = maxOff
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	end := offset + height
+	return strings.Join(lines[offset:end], "\n"), fmt.Sprintf("%d-%d/%d", offset+1, end, len(lines))
+}
+
+// contentLines splits rendered pane content the same way drawPanel does.
+func contentLines(content string) []string {
+	if content == "" {
+		return nil
+	}
+	return strings.Split(strings.TrimRight(content, "\n"), "\n")
+}
+
+// lb-aio
+// scrollsContent reports whether movement keys drive the content pane
+// instead of the list cursor.
+func (m Model) scrollsContent() bool {
+	switch m.view {
+	case viewDetail, viewGraph, viewHealth:
+		return true
+	}
+	return m.wide() && m.pane == 1
+}
+
+// lb-aio
+// contentExtent re-renders the scrollable pane so key handling can clamp the
+// offset against the same line count the frame will draw.
+func (m Model) contentExtent() (lines, viewport int) {
+	m = m.normalized()
+	th := newTheme(m.opts)
+	viewport = m.bodyHeight(th) - 2
+	if viewport < 1 {
+		viewport = 1
+	}
+	var content string
+	switch m.view {
+	case viewDetail:
+		content = m.renderDetail(th, m.width-2)
+	case viewGraph:
+		content = m.renderGraph(th)
+	case viewHealth:
+		content = m.renderHealth(th)
+	default:
+		_, rightW := m.paneWidths()
+		content = m.renderPreview(th, rightW-2)
+	}
+	return len(contentLines(content)), viewport
+}
+
+// lb-aio
+// clampScroll keeps the offset inside the content and pins it to zero for
+// panes that do not scroll.
+func (m *Model) clampScroll() {
+	if !m.scrollsContent() {
+		m.scroll = 0
+		return
+	}
+	lines, viewport := m.contentExtent()
+	maxOff := lines - viewport
+	if maxOff < 0 {
+		maxOff = 0
+	}
+	if m.scroll > maxOff {
+		m.scroll = maxOff
+	}
+	if m.scroll < 0 {
+		m.scroll = 0
+	}
 }
 
 func (m Model) panel(th theme, title, content string, width, height int, focused bool) string {
@@ -425,6 +546,7 @@ func (m Model) renderHelp(th theme) string {
 		th.title.Render("Keys"),
 		"",
 		"  " + th.key.Render("j/k") + "  move          " + th.key.Render("tab") + "  other pane",
+		"  " + th.key.Render("tab") + " then " + th.key.Render("j/k") + "  scroll preview   " + th.key.Render("ctrl+d/u") + "  page   " + th.key.Render("G/home") + "  ends",
 		"  " + th.key.Render("enter") + "  inspect      " + th.key.Render("g") + "  graph",
 		"  " + th.key.Render("c") + "  claim          " + th.key.Render("x") + "  close",
 		"  " + th.key.Render("u") + "  unclaim        " + th.key.Render("n") + "  create",
