@@ -335,3 +335,45 @@ func TestPreviewPaneScrollsWhenFocused(t *testing.T) {
 		t.Fatalf("preview scroll never reached the tail:\n%s", m.View())
 	}
 }
+
+// lb-cqf
+func TestYankCopiesSelectedIDToClipboard(t *testing.T) {
+	m, _ := testModel(t)
+	m = pump(m, m.Init())
+	var got []string
+	m.clip = func(s string) error {
+		got = append(got, s)
+		return nil
+	}
+
+	nm, cmd := m.Update(key("y"))
+	m = pump(nm.(Model), cmd)
+	if len(got) != 1 || got[0] != "lb-1" {
+		t.Fatalf("y wrote %v to the clipboard, want [lb-1]", got)
+	}
+	if !strings.Contains(m.status, "lb-1") {
+		t.Errorf("status = %q, want it to name the copied id", m.status)
+	}
+
+	nm, cmd = m.Update(key("Y"))
+	m = pump(nm.(Model), cmd)
+	if len(got) != 2 || got[1] != "lb show lb-1" {
+		t.Fatalf("Y wrote %v to the clipboard, want [... lb show lb-1]", got)
+	}
+}
+
+// lb-cqf
+func TestYankReportsClipboardFailure(t *testing.T) {
+	m, _ := testModel(t)
+	m = pump(m, m.Init())
+	m.clip = func(string) error { return fmt.Errorf("no clipboard tool") }
+
+	nm, cmd := m.Update(key("y"))
+	m = pump(nm.(Model), cmd)
+	if !strings.Contains(m.status, "no clipboard tool") {
+		t.Fatalf("status = %q, want the clipboard error surfaced", m.status)
+	}
+	if m.copied != "" {
+		t.Errorf("copied = %q, want empty after a failed clipboard write", m.copied)
+	}
+}

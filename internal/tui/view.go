@@ -553,7 +553,8 @@ func (m Model) renderHelp(th theme) string {
 		"  " + th.key.Render("r/f/b/i/a/m/h") + "  switch view",
 		"  " + th.key.Render("/") + "  filter (closed, status:open)   " + th.key.Render(":") + "  command",
 		"  " + th.key.Render("R") + "  refresh        " + th.key.Render("?") + "  help",
-		"  " + th.key.Render("y") + "  copy id        " + th.key.Render("q") + "  back / quit",
+		"  " + th.key.Render("y") + "  copy id        " + th.key.Render("Y") + "  copy lb show <id>",
+		"  " + th.key.Render("q") + "  back / quit",
 		"",
 		th.dim.Render("Mutations confirm. TUI calls the same Service as lb."),
 	}, "\n")

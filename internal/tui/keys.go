@@ -150,24 +150,43 @@ func (m Model) handleNavKey(k string) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "y":
-		if row, ok := m.currentRow(); ok {
-			m.copied = row.ID
-			m.status = "copied " + row.ID
-		} else if m.selectedID != "" {
-			m.copied = m.selectedID
-			m.status = "copied " + m.selectedID
-		}
+		return m.yank(m.yankID()), nil
 	case "Y":
-		id := m.selectedID
-		if row, ok := m.currentRow(); ok {
-			id = row.ID
-		}
-		if id != "" {
-			m.copied = "lb show " + id
-			m.status = "copied lb show " + id
+		if id := m.yankID(); id != "" {
+			return m.yank("lb show " + id), nil
 		}
 	}
 	return m, nil
+}
+
+// lb-cqf
+// yankID is the issue the cursor is on, or the one the detail view is showing.
+func (m Model) yankID() string {
+	if row, ok := m.currentRow(); ok && row.ID != "" {
+		return row.ID
+	}
+	return m.selectedID
+}
+
+// lb-cqf
+// yank puts text on the system clipboard and reports what happened in the
+// status line — a silent no-op is indistinguishable from a copy that worked.
+func (m Model) yank(text string) Model {
+	if text == "" {
+		m.status = "no issue selected"
+		return m
+	}
+	copy := m.clip
+	if copy == nil {
+		copy = copyToClipboard
+	}
+	if err := copy(text); err != nil {
+		m.status = "clipboard: " + err.Error()
+		return m
+	}
+	m.copied = text
+	m.status = "copied " + text
+	return m
 }
 
 // lb-aio

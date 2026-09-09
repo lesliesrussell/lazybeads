@@ -84,6 +84,7 @@ type Model struct {
 	selectedID  string
 	showArgv    bool
 	copied      string
+	clip        clipboardFunc // lb-cqf: swapped out in tests
 	lastRefresh time.Time
 	pane        int // 0 list, 1 preview — lazygit-style focused panel
 	scroll      int // lb-aio: vertical offset of the focused content pane
@@ -126,7 +127,7 @@ func New(svc *app.Service, opts Options) Model {
 	if opts.Height <= 0 {
 		opts.Height = 24
 	}
-	m := Model{svc: svc, opts: opts, width: opts.Width, height: opts.Height, view: viewReady, loading: true}
+	m := Model{svc: svc, opts: opts, width: opts.Width, height: opts.Height, view: viewReady, loading: true, clip: copyToClipboard}
 	switch strings.ToLower(opts.View) {
 	case "focus":
 		m.view = viewFocus
