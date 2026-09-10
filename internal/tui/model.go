@@ -67,6 +67,9 @@ type Model struct {
 	rows   []listRow
 	filter string
 	input  string
+	// lb-zhz: status narrowing for the issues view, cycled with [ and ].
+	// Empty means every status.
+	statusFilter string
 
 	ready    *app.ReadyResult
 	focus    *app.FocusReport
@@ -159,6 +162,7 @@ func (m Model) loadView() tea.Cmd {
 	view := m.view
 	id := m.selectedID
 	filter := m.filter
+	status := m.statusFilter // lb-zhz
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -182,7 +186,7 @@ func (m Model) loadView() tea.Cmd {
 			}
 			return blockedMsg{res}
 		case viewIssues:
-			res, err := svc.List(ctx, app.ListRequest{Query: filter, All: true})
+			res, err := svc.List(ctx, app.ListRequest{Query: filter, Status: status, All: true})
 			if err != nil {
 				return errMsg{err}
 			}
@@ -329,13 +333,28 @@ func (m *Model) clampCursor() {
 }
 
 func (m Model) visibleRows() []listRow {
-	if m.filter == "" {
+	if m.filter == "" && m.statusFilter == "" {
 		return m.rows
+	}
+	rows := m.rows
+	// lb-zhz: the cycled status narrows the rows locally too, so the list is
+	// right the instant the key is pressed rather than a reload later.
+	if m.statusFilter != "" {
+		kept := make([]listRow, 0, len(rows))
+		for _, r := range rows {
+			if strings.EqualFold(string(r.Issue.Status), m.statusFilter) {
+				kept = append(kept, r)
+			}
+		}
+		rows = kept
+	}
+	if m.filter == "" {
+		return rows
 	}
 	status, query := app.ParseListFilter(m.filter)
 	q := strings.ToLower(query)
 	var out []listRow
-	for _, r := range m.rows {
+	for _, r := range rows {
 		if status != "" && !strings.EqualFold(string(r.Issue.Status), status) {
 			continue
 		}
@@ -470,4 +489,40 @@ func memoryRows(items []domain.Memory, _ string) []listRow {
 		out = append(out, listRow{ID: mem.ID, Title: mem.Content, Meta: "memory"})
 	}
 	return out
+}
+
+// lb-zhz
+// statusCycle is the order [ walks. The empty entry is "every status", so the
+// cycle always returns to an unfiltered list.
+var statusCycle = []string{
+	"",
+	string(domain.StatusOpen),
+	string(domain.StatusInProgress),
+	string(domain.StatusBlocked),
+	string(domain.StatusDeferred),
+	string(domain.StatusClosed),
+}
+
+// lb-zhz
+// cycleStatus advances the status filter by step positions and reloads, since
+// the list itself is fetched with the status constraint.
+func (m Model) cycleStatus(step int) (tea.Model, tea.Cmd) {
+	idx := 0
+	for i, s := range statusCycle {
+		if s == m.statusFilter {
+			idx = i
+			break
+		}
+	}
+	n := len(statusCycle)
+	m.statusFilter = statusCycle[((idx+step)%n+n)%n]
+	m.cursor = 0
+	m.scroll = 0
+	m.loading = true
+	if m.statusFilter == "" {
+		m.status = "status: all"
+	} else {
+		m.status = "status: " + m.statusFilter
+	}
+	return m, m.loadView()
 }

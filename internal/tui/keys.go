@@ -149,6 +149,16 @@ func (m Model) handleNavKey(k string) (tea.Model, tea.Cmd) {
 			m.clampScroll()
 		}
 		return m, nil
+	case "[", "]":
+		// lb-zhz: status cycling only makes sense where every status is in
+		// scope; ready/blocked/focus already imply one.
+		if m.view != viewIssues {
+			return m, nil
+		}
+		if k == "[" {
+			return m.cycleStatus(1)
+		}
+		return m.cycleStatus(-1)
 	case "y":
 		return m.yank(m.yankID()), nil
 	case "Y":

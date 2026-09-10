@@ -377,3 +377,53 @@ func TestYankReportsClipboardFailure(t *testing.T) {
 		t.Errorf("copied = %q, want empty after a failed clipboard write", m.copied)
 	}
 }
+
+// lb-zhz
+func TestBracketCyclesIssueStatusFilter(t *testing.T) {
+	m, _ := testModel(t)
+	m = pump(m, m.Init())
+	m = step(m, "i") // issues view
+	if !strings.Contains(m.View(), "closed") {
+		t.Fatalf("issues view should start unfiltered:\n%s", m.View())
+	}
+	m = step(m, "[")
+	if m.statusFilter != "open" {
+		t.Fatalf("statusFilter = %q, want open", m.statusFilter)
+	}
+	view := m.View()
+	if strings.Contains(view, "lb-3") {
+		t.Errorf("closed issue survived the open filter:\n%s", view)
+	}
+	if !strings.Contains(view, "open") {
+		t.Errorf("title must name the active status filter:\n%s", view)
+	}
+	for _, want := range []string{"in_progress", "blocked", "deferred", "closed", ""} {
+		m = step(m, "[")
+		if m.statusFilter != want {
+			t.Fatalf("statusFilter = %q, want %q", m.statusFilter, want)
+		}
+	}
+	m = step(m, "]")
+	if m.statusFilter != "closed" {
+		t.Fatalf("] should cycle backwards; statusFilter = %q, want closed", m.statusFilter)
+	}
+	if !strings.Contains(m.View(), "lb-3") {
+		t.Errorf("closed filter should show the closed issue:\n%s", m.View())
+	}
+}
+
+// lb-zhz
+func TestBracketIsInertOutsideIssuesView(t *testing.T) {
+	m, _ := testModel(t)
+	m = pump(m, m.Init())
+	m = step(m, "[")
+	if m.statusFilter != "" {
+		t.Fatalf("statusFilter = %q, want empty on the ready view", m.statusFilter)
+	}
+}
+
+// lb-zhz: press one key and drain whatever command it produced.
+func step(m Model, k string) Model {
+	nm, cmd := m.Update(key(k))
+	return pump(nm.(Model), cmd)
+}

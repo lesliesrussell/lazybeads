@@ -552,6 +552,7 @@ func (m Model) renderHelp(th theme) string {
 		"  " + th.key.Render("u") + "  unclaim        " + th.key.Render("n") + "  create",
 		"  " + th.key.Render("r/f/b/i/a/m/h") + "  switch view",
 		"  " + th.key.Render("/") + "  filter (closed, status:open)   " + th.key.Render(":") + "  command",
+		"  " + th.key.Render("[/]") + "  cycle status filter (issues view)",
 		"  " + th.key.Render("R") + "  refresh        " + th.key.Render("?") + "  help",
 		"  " + th.key.Render("y") + "  copy id        " + th.key.Render("Y") + "  copy lb show <id>",
 		"  " + th.key.Render("q") + "  back / quit",
@@ -625,7 +626,11 @@ func (m Model) viewTitle() string {
 	case viewBlocked:
 		return "Blocked"
 	case viewIssues:
-		return "Issues"
+		// lb-zhz
+		if m.statusFilter != "" {
+			return "Issues · " + m.statusFilter
+		}
+		return "Issues · all"
 	case viewActivity:
 		return "Activity"
 	case viewMemory:
