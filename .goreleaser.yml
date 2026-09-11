@@ -4,9 +4,12 @@ project_name: lazybeads
 # lb-b4p: render the embedded man page so release archives carry lb.1 too.
 # `lb man` works from any downloaded binary regardless, but a tarball that
 # unpacks a man page is what packagers expect.
+# lb-ejg: the hook must carry the same -X as the builds section below, or the
+# rendered page's .TH line reports the compiled-in default and the archived
+# lb.1 disagrees with the `lb man` of the binary beside it.
 before:
   hooks:
-    - go build -o bin/lb ./cmd/lb
+    - go build -ldflags "-X github.com/lesliesrussell/lazybeads/internal/version.Version={{ .Version }}" -o bin/lb ./cmd/lb
     - sh -c 'mkdir -p man && ./bin/lb man > man/lb.1'
 builds:
   - id: lb
