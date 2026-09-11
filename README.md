@@ -14,8 +14,13 @@ go install github.com/lesliesrussell/lazybeads/cmd/lb@latest
 
 ```sh
 lb completion zsh    # print a completion script
-lb man | man -l -    # read the lb(1) page
+man lb               # the lb(1) page, once installed
+make man && man ./man/lb.1   # or render and read it from the source tree
 ```
+
+The manual is embedded in the binary, so `lb man` prints it anywhere — including
+from a downloaded release — and covers every command and flag, the configuration
+schema, environment variables, exit codes, the JSON envelope, and the TUI keys.
 
 Requires a Beads CLI (`bd`) on `PATH`, or `LB_BD_BIN`. Tested against Beads 1.0.x; see [docs/compatibility.md](docs/compatibility.md).
 

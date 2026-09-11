@@ -2,25 +2,23 @@
 package cli
 
 import (
-	"github.com/spf13/cobra"
-	"github.com/spf13/cobra/doc"
+	"io"
 
+	"github.com/spf13/cobra"
+
+	"github.com/lesliesrussell/lazybeads/internal/manpage"
 	"github.com/lesliesrussell/lazybeads/internal/version"
 )
 
+// lb-b4p
 func (rt *runtime) manCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "man",
 		Short: "Print the lb(1) manual page",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			header := &doc.GenManHeader{
-				Title:   "LB",
-				Section: "1",
-				Source:  "LazyBeads " + version.Version,
-				Manual:  "LazyBeads Manual",
-			}
-			return doc.GenMan(cmd.Root(), header, rt.opts.Stdout)
+			_, err := io.WriteString(rt.opts.Stdout, manpage.Roff(version.Version))
+			return err
 		},
 	}
 }

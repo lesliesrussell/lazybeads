@@ -1,6 +1,13 @@
 # lb-uvj
 version: 2
 project_name: lazybeads
+# lb-b4p: render the embedded man page so release archives carry lb.1 too.
+# `lb man` works from any downloaded binary regardless, but a tarball that
+# unpacks a man page is what packagers expect.
+before:
+  hooks:
+    - go build -o bin/lb ./cmd/lb
+    - sh -c 'mkdir -p man && ./bin/lb man > man/lb.1'
 builds:
   - id: lb
     main: ./cmd/lb
@@ -16,6 +23,10 @@ archives:
     format_overrides:
       - goos: windows
         formats: [zip]
+    files:
+      - LICENSE
+      - README.md
+      - man/lb.1
 checksum:
   name_template: checksums.txt
 changelog:

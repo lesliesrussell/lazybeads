@@ -7,3 +7,6 @@
 .beads/*.db
 .omc/state/
 .DS_Store
+
+# lb-b4p: rendered from the embedded page by `make man`
+man/

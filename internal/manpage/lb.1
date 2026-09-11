@@ -1,0 +1,1288 @@
+.\" lb-b4p
+.\" Manual page for LazyBeads.
+.TH LB 1 "2026-09-11" "LazyBeads @VERSION@" "LazyBeads Manual"
+.nh
+.ad l
+.
+.SH NAME
+lb \- terminal operator console for Beads issue tracking
+.
+.SH SYNOPSIS
+.B lb
+.RI [ global-options ]
+.I command
+.RI [ command-options ]
+.RI [ arguments ]
+.br
+.B lb
+.RI [ global-options ]
+.
+.SH DESCRIPTION
+.B LazyBeads
+is a read-first console over
+.BR bd (1),
+the Beads issue tracker. It helps an operator find the highest-leverage ready
+task, understand why that task is ready, and act on it without losing the
+audit trail.
+.PP
+.B lb
+never talks to a database directly. Every read and every mutation is a
+subprocess call to
+.BR bd ,
+executed as an argument vector with no shell interpolation. Anything
+.B bd
+cannot do,
+.B lb
+does not do either.
+.PP
+Invoked with no command on an interactive terminal,
+.B lb
+starts the full-screen interface described under
+.BR "INTERACTIVE INTERFACE" .
+With a command, or when standard input or output is not a terminal, it behaves
+as an ordinary non-interactive tool: one shot, a stable exit code, and
+optionally a versioned JSON envelope.
+.
+.SH GLOBAL OPTIONS
+These flags are accepted by every command.
+.
+.SS Output
+.TP
+.B \-\-json
+Emit the stable JSON envelope described under
+.BR "JSON OUTPUT" .
+Equivalent to
+.BR "\-\-format json" ,
+and it overrides
+.BR \-\-format .
+.TP
+.BI \-\-format " format"
+One of
+.BR human " (default), " json ", or " jsonl
+.RB ( ndjson
+is accepted as a synonym, and
+.B text
+as a synonym for
+.BR human ).
+.B \-\-format yaml
+is rejected with a usage error; YAML is not implemented.
+.TP
+.BI \-\-color " mode"
+One of
+.BR auto " (default), " always ", or " never .
+Unset, the value falls back to
+.B general.color
+in configuration.
+.TP
+.B \-\-no\-color
+Same as
+.BR "\-\-color never" .
+Takes precedence over
+.BR \-\-color .
+.TP
+.B \-\-ascii
+Use ASCII glyphs instead of Unicode box drawing and status symbols. Implied by
+.B tui.ascii
+in configuration.
+.TP
+.B \-\-quiet
+Suppress secondary commentary: notes, hints, and progress. Errors are still
+printed.
+.TP
+.B \-\-verbose
+Include upstream diagnostic detail. On failure this prints the captured
+.B bd
+stderr; on
+.B lb next
+it shows the full scoring breakdown.
+.TP
+.B \-\-debug
+Trace every
+.B bd
+invocation to stderr with secrets redacted, including argument vector, exit
+code, and duration.
+.
+.SS Workspace selection
+.TP
+.BI \-\-project " path"
+Resolve the Beads workspace starting from this repository path instead of the
+current working directory. This also selects which
+.B .lazybeads.toml
+is discovered.
+.TP
+.BI \-\-beads\-dir " path"
+Use this Beads directory explicitly, skipping discovery.
+.TP
+.BI \-\-rig " name"
+Select a named rig for cross-rig operation.
+.TP
+.BI \-\-actor " identity"
+Operator identity recorded on mutations and used by
+.BR "\-\-assignee me" .
+See
+.BR "ACTOR IDENTITY" .
+.TP
+.BI \-\-timeout " duration"
+Maximum wall-clock time for a single
+.B bd
+invocation, for example
+.BR 30s .
+See
+.BR "DURATION SYNTAX" .
+The default is 30 seconds.
+.
+.SS Mutation safety
+.TP
+.B \-\-yes
+Skip the interactive confirmation prompt. Required for any mutation in a
+non-interactive context; without it
+.B lb
+refuses to mutate rather than assuming consent.
+.TP
+.B \-\-dry\-run
+Print the
+.B bd
+argument vector that would be executed and exit without running it. Implies no
+confirmation prompt and no mutation.
+.
+.SS Informational
+.TP
+.B \-\-version
+Print the LazyBeads version and exit.
+.TP
+.B \-h ", " \-\-help
+Print usage for the command and exit.
+.
+.SH COMMANDS
+.
+.SS Overview and discovery
+.TP
+.B lb status
+Workspace health and work-state overview: ready, in-progress, and blocked
+counts, the resolved workspace and actor, and any health checks that are not
+.BR ok .
+.RS
+.TP
+.BI \-\-watch " duration"
+Re-render on an interval, for example
+.BR 5s .
+Runs until interrupted.
+.RE
+.TP
+.B lb ready
+Unblocked work, ranked for an operator.
+.RS
+.TP
+.BI \-\-priority\-max " n"
+Keep issues at priority
+.I n
+or more urgent. Default 4 (everything).
+.TP
+.BI \-\-label " name"
+Require this label. Repeat to require all of them (AND).
+.TP
+.BI \-\-parent " id"
+Restrict to children of this issue.
+.TP
+.BI \-\-sort " key"
+One of
+.BR priority " (default), " leverage ", or " age .
+.TP
+.BI \-\-limit " n"
+Maximum issues to print. 0 means no limit.
+.RE
+.TP
+.B lb next
+Recommend the highest-leverage ready task and explain the factors behind the
+score. Every contributing factor is named; nothing influences a recommendation
+invisibly. Use
+.B \-\-verbose
+for the full breakdown.
+.RS
+.TP
+.BI \-\-strategy " name"
+One of
+.BR priority ", " leverage ", " age ", " balanced ", or " random .
+Defaults to
+.B ranking.strategy
+in configuration
+.RB ( balanced ).
+.TP
+.BI \-\-limit " n"
+How many ranked tasks to show. Default 1; the rest are reported as
+alternatives.
+.TP
+.BI \-\-parent " id"
+Restrict recommendations to this epic or parent.
+.RE
+.TP
+.BI "lb show" " id"
+Render one issue in an action-oriented format: identity, status, priority,
+assignee, blockers, dependents, and description.
+.RS
+.TP
+.B \-\-events
+Include recent history inferred from the underlying commits.
+.TP
+.B \-\-raw
+Print the upstream JSON payload exactly as
+.B bd
+returned it, bypassing LazyBeads rendering.
+.RE
+.TP
+.B lb list
+Filter issues with Beads-compatible constraints.
+.RS
+.TP
+.BI \-\-status " status"
+Filter by status:
+.BR open ", " in_progress ", " blocked ", " deferred ", " closed .
+.TP
+.BI \-\-type " type"
+Filter by issue type, for example
+.BR task ", " bug ", " feature ", " epic .
+.TP
+.BI \-\-label " name"
+Require this label. Repeat to require all of them (AND).
+.TP
+.BI \-\-label\-any " name"
+Match any of these labels (OR). Repeatable.
+.TP
+.BI \-\-assignee " actor"
+Filter by assignee. The literal
+.B me
+resolves to the current actor and fails with a usage error if no actor is
+configured.
+.TP
+.BI \-\-query " text"
+Local full-text filter applied after Beads returns candidates.
+.TP
+.BI \-\-created\-after " time"
+Keep issues created after this time.
+.TP
+.BI \-\-updated\-before " time"
+Keep issues updated before this time.
+.TP
+.B \-\-all
+Disable the default safety limit and include closed work.
+.TP
+.BI \-\-limit " n"
+Maximum issues to print.
+.RE
+.TP
+.BI "lb search" " query..."
+Fuzzy discovery across issue identity, title, description, and labels. All
+arguments are joined with spaces into one query.
+.RS
+.TP
+.B \-\-all
+Include closed issues.
+.TP
+.BI \-\-limit " n"
+Maximum results. Default 20.
+.RE
+.
+.SS Explanation and graph
+.TP
+.BI "lb why" " id"
+Explain why an issue is ready or blocked, naming the specific unresolved
+blockers and the path to each.
+.RS
+.TP
+.BI \-\-depth " n"
+Traversal depth. 0 uses
+.B ranking.max_graph_depth
+from configuration.
+.TP
+.B \-\-all\-paths
+Keep every path through a cycle instead of collapsing to the first.
+.RE
+.TP
+.BI "lb graph" " id"
+Render a dependency graph rooted at an issue.
+.RS
+.TP
+.BI \-\-direction " dir"
+One of
+.BR blockers ", " dependents ", or " both " (default)."
+.TP
+.BI \-\-depth " n"
+Traversal depth. 0 uses the configured default.
+.TP
+.BI \-\-format " form"
+One of
+.BR tree " (default), " dot ", or " json .
+This is separate from the global
+.BR \-\-format ;
+.B dot
+emits Graphviz source suitable for piping to
+.BR dot (1).
+.RE
+.TP
+.B lb blocked
+Blocked work grouped by its closest unresolved blocker, so a single fix that
+unblocks many issues is visible as one group.
+.RS
+.TP
+.BI \-\-priority\-max " n"
+Keep this priority or more urgent.
+.TP
+.BI \-\-group\-by " key"
+.BR blocker " (default) or " parent .
+.RE
+.
+.SS Operator views
+.TP
+.B lb focus
+Work most relevant to the current operator: issues you have claimed, plus work
+you have recently touched.
+.RS
+.TP
+.B \-\-all\-actors
+Include every actor's claimed work, not only your own.
+.TP
+.BI \-\-recent " duration"
+Recently-touched window. Default
+.BR 24h .
+Accepts
+.B today
+as well as a duration.
+.RE
+.TP
+.B lb stale
+Surface quiet in-progress claims: work that is claimed but has not moved.
+.RS
+.TP
+.BI \-\-since " duration"
+Idle threshold. Defaults to
+.B general.stale_after
+from configuration (8h). Accepts
+.BR today .
+.TP
+.BI \-\-priority\-max " n"
+Keep this priority or more urgent.
+.TP
+.B \-\-claimed\-only
+Only issues that actually have an assignee.
+.RE
+.TP
+.B lb activity
+Operational event feed inferred from the underlying commit history.
+.RS
+.TP
+.BI \-\-since " duration"
+How far back to look. Default
+.BR 24h ;
+.B today
+is accepted.
+.TP
+.BI \-\-issue " id"
+Restrict to one issue.
+.TP
+.BI \-\-actor " identity"
+Restrict to one actor.
+.TP
+.BI \-\-type " kind"
+Restrict to an event kind.
+.RE
+.
+.SS Mutations
+All commands in this section prompt for confirmation before touching Beads
+unless
+.B \-\-yes
+or
+.B \-\-dry\-run
+is given. See
+.BR "MUTATION SAFETY" .
+.TP
+.BI "lb create" " title"
+Create an issue.
+.RS
+.TP
+.BI \-\-type " type"
+Issue type. Default
+.BR task .
+.TP
+.BI \-\-priority " n"
+Priority 0\-4, where 0 is most urgent. Default 2.
+.TP
+.BI \-\-description " text"
+Issue description.
+.TP
+.BI \-\-description\-file " path"
+Read the description from a file. Overrides
+.BR \-\-description .
+.TP
+.BI \-\-label " name"
+Attach a label. Repeatable.
+.TP
+.BI \-\-assignee " actor"
+Assign the new issue.
+.TP
+.BI \-\-parent " id"
+Parent issue.
+.TP
+.BI \-\-metadata " key=value"
+Attach metadata. Repeatable. A bare
+.I key
+with no
+.B =
+stores an empty value.
+.RE
+.TP
+.BI "lb edit" " id"
+Update fields on an issue. At least one field flag or
+.B \-\-open\-in\-editor
+is required; an edit that would change nothing is a usage error.
+.RS
+.TP
+.BI \-\-title " text"
+New title.
+.TP
+.BI \-\-description " text"
+New description.
+.TP
+.BI \-\-description\-file " path"
+Read the new description from a file.
+.TP
+.BI \-\-type " type"
+New type.
+.TP
+.BI \-\-priority " n"
+New priority, 0\-4.
+.TP
+.BI \-\-label " spec"
+.BI add: name
+adds a label and
+.BI remove: name
+removes one. A bare
+.I name
+is treated as
+.BR add: .
+Repeatable.
+.TP
+.B \-\-open\-in\-editor
+Open the issue as YAML frontmatter in
+.B $VISUAL
+or
+.BR $EDITOR ,
+and apply whatever changed on save.
+.RE
+.TP
+.BI "lb claim" " id"
+Atomically claim an issue for the current actor. If the issue is already
+assigned to somebody else, the confirmation prompt says so before you commit to
+it.
+.TP
+.BI "lb unclaim" " id"
+Release a claim, when the installed
+.B bd
+supports it. If it does not, the command exits with the capability code rather
+than silently approximating the operation.
+.TP
+.BI "lb close" " id " [ reason ]
+Close an issue. A reason is required and may be given either as trailing
+arguments or with
+.BR \-\-reason .
+.RS
+.TP
+.BI \-\-reason " text"
+Close reason.
+.RE
+.TP
+.BI "lb reopen" " id"
+Reopen a closed issue.
+.RS
+.TP
+.BI \-\-reason " text"
+Reopen reason.
+.RE
+.TP
+.BI "lb assign" " id " [ actor ]
+Record responsibility without claiming.
+.RS
+.TP
+.B \-\-clear
+Clear the assignee. Without this, an actor argument is required.
+.RE
+.
+.SS Dependencies
+.TP
+.BI "lb dep add" " child parent"
+Make
+.I child
+wait on
+.IR parent .
+Arguments are never reordered, and the relation is always printed explicitly in
+the confirmation so the direction cannot be mistaken.
+.RS
+.TP
+.BI \-\-type " relation"
+Relation type. Default
+.BR blocks .
+.RE
+.TP
+.BI "lb dep remove" " child parent"
+Remove a dependency edge.
+.TP
+.BI "lb dep list" " id"
+List blockers and dependents of one issue.
+.TP
+.B lb dep validate
+Report dependency cycles. Read-only: it never mutates anything.
+.
+.SS Memory
+.TP
+.B lb memory list
+List durable project memories.
+.TP
+.BI "lb memory search" " query..."
+Search memories.
+.TP
+.BI "lb memory add" " text..."
+Remember a durable note. This is a mutation and confirms.
+.TP
+.BI "lb memory retire" " id"
+Forget a memory. This is a mutation and confirms.
+.TP
+.B lb memory prime
+Print the Beads workflow context block, suitable for feeding to an agent at the
+start of a session.
+.
+.SS Sync
+.TP
+.B lb sync status
+Read-only visibility into Beads and Dolt remote state. This is also what plain
+.B lb sync
+does.
+.TP
+.BR "lb sync pull" ", " "lb sync push"
+Deferred from v1. Both exit with a usage error directing you to run
+.B bd dolt pull
+or
+.B bd dolt push
+yourself after inspecting
+.BR "lb sync status" .
+Mutating sync is deliberately not wrapped: it rewrites shared history, and
+LazyBeads will not do that behind a confirmation prompt it designed.
+.
+.SS Diagnostics and shell integration
+.TP
+.B lb doctor
+Diagnose tool, workspace, and operator health. Unlike every other command,
+.B lb doctor
+still runs and reports when workspace resolution itself failed, so it can
+explain why nothing else works.
+.RS
+.PP
+Checks include:
+.BR bd " presence and version, JSON schema compatibility, workspace resolution,"
+actor configuration, which configuration files were loaded, keybinding
+collisions, editor availability, stale claims, dependency cycles, and sync
+state.
+.TP
+.B \-\-fix
+Write local configuration, the cache directory, and shell completion scripts.
+It never mutates Beads and never edits your shell rc files; it prints the paths
+it wrote and leaves sourcing to you.
+.TP
+.B \-\-verbose
+Include per-check detail.
+.RE
+.TP
+.BR "lb completion" " " { bash | zsh | fish | powershell }
+Print a shell completion script on standard output. See
+.BR "SHELL COMPLETION" .
+.TP
+.B lb man
+Print this manual page in
+.BR roff (7)
+form on standard output. This is what
+.B make install
+pipes into the man directory.
+.TP
+.B lb version
+Print the LazyBeads version.
+.
+.SS Interactive
+.TP
+.B lb tui
+Start the full-screen interface.
+.RS
+.TP
+.BI \-\-view " name"
+Initial view:
+.BR ready " (default), " focus ", " blocked ", " issues ", " activity ", " memory ", or " health .
+.TP
+.BI \-\-issue " id"
+Open this issue in the detail view on startup.
+.RE
+.
+.SH WORKSPACE RESOLUTION
+The Beads workspace is resolved from the first of these that yields one:
+.IP 1. 4
+.B \-\-beads\-dir
+.IP 2. 4
+.B LB_BEADS_DIR
+.IP 3. 4
+.B workspace.beads_dir
+in configuration
+.IP 4. 4
+discovery upward from
+.B \-\-project
+or, failing that, the current working directory
+.PP
+.B \-\-rig
+selects among rigs when the resolved workspace exposes more than one.
+Resolution failure is exit code 4, and the error names the directory that was
+searched.
+.
+.SH ACTOR IDENTITY
+The actor is the identity LazyBeads records on mutations and resolves for
+.BR "\-\-assignee me" ,
+.BR "lb focus" ,
+and the "my active work" grouping. It is resolved from the first non-empty
+value of:
+.IP 1. 4
+the
+.B \-\-actor
+flag
+.IP 2. 4
+the
+.B LB_ACTOR
+environment variable
+.IP 3. 4
+.B general.actor
+in configuration
+.IP 4. 4
+.BR "git config user.name" ,
+then
+.BR "git config user.email" ,
+when
+.B general.use_git_identity
+is true
+.PP
+With no actor configured,
+.B lb status
+and
+.B lb doctor
+raise a warning, and
+.B \-\-assignee me
+is a usage error. Mutations still work; they are simply recorded without an
+attributed operator.
+.
+.SH CONFIGURATION
+Configuration is TOML. Layers are merged lowest to highest:
+.IP 1. 4
+built-in defaults
+.IP 2. 4
+the user configuration file
+.IP 3. 4
+the project file
+.RB ( .lazybeads.toml ,
+discovered by walking upward from the starting directory to the filesystem
+root)
+.IP 4. 4
+environment variables
+.IP 5. 4
+command-line flags
+.PP
+A missing file is not an error. An unreadable or malformed one is, and the
+message always names the offending path.
+.B lb doctor
+lists every file that actually contributed.
+.
+.SS [general]
+.TP
+.B bd_binary
+Path or name of the Beads executable. Default
+.BR bd .
+.TP
+.B actor
+Operator identity. See
+.BR "ACTOR IDENTITY" .
+.TP
+.B color
+.BR auto " (default), " always ", or " never .
+.TP
+.B default_view
+Initial TUI view. Default
+.BR ready .
+.TP
+.B confirm_mutations
+Boolean, default
+.BR true .
+Setting it false disables the confirmation prompt for this workspace.
+.TP
+.B stale_after
+Idle threshold used by
+.BR "lb stale" .
+Default
+.BR 8h .
+Must be positive.
+.TP
+.B refresh_interval
+TUI auto-refresh interval. Default
+.BR 30s .
+Must be positive.
+.TP
+.B timeout
+Per-invocation
+.B bd
+timeout. Default
+.BR 30s .
+Must be positive.
+.TP
+.B use_git_identity
+Boolean. Fall back to the repository's git identity when no actor is otherwise
+configured. Default false.
+.
+.SS [workspace]
+.TP
+.B project
+Repository path to resolve from.
+.TP
+.B beads_dir
+Explicit Beads directory.
+.TP
+.B rig
+Rig name.
+.TP
+.B focus_parent
+Epic or parent that
+.B lb focus
+treats as the current focus.
+.TP
+.B focus_labels
+Array of labels that mark focused work; contributes
+.B focus_weight
+to ranking.
+.TP
+.B exclude_labels
+Array of labels whose issues are hidden from ranked views.
+.TP
+.B ignore_issues
+Array of issue ids to suppress entirely.
+.
+.SS [ranking]
+Every weight is exposed here on purpose: no factor may influence a
+recommendation invisibly.
+.TP
+.B strategy
+.BR priority ", " leverage ", " age ", " balanced " (default), or " random .
+.TP
+.B priority_weight
+Default 100.
+.TP
+.B leverage_weight
+Default 15. Leverage counts the issues an issue directly unblocks.
+.TP
+.B age_weight
+Default 1.
+.TP
+.B focus_weight
+Default 25. Applied to issues matching
+.B workspace.focus_parent
+or
+.BR workspace.focus_labels .
+.TP
+.B recently_unblocked_weight
+Default 10. Applies only when an issue's update time is later than its creation
+time, that is, when it was genuinely released by a later unblocking rather than
+merely newly filed.
+.TP
+.B complexity_penalty_weight
+Default 0.
+.TP
+.B max_graph_depth
+Default 8. Bounds
+.B lb why
+and
+.BR "lb graph" .
+.TP
+.B max_graph_nodes
+Default 500. Traversal that hits this bound reports truncation rather than
+silently returning a partial graph.
+.
+.SS [tui]
+.TP
+.B mouse
+Enable mouse support. Default false.
+.TP
+.B ascii
+Use ASCII glyphs. Default false.
+.TP
+.B compact
+Denser rows. Default false.
+.TP
+.B show_descriptions
+Show descriptions in the preview pane. Default true.
+.TP
+.B reduced_motion
+Suppress animation and spinners. Default false.
+.
+.SS [keys]
+.TP
+.B layout
+.BR logical " (default) or " physical .
+.TP
+.BR global ", " list ", " detail
+Tables mapping an action name to an array of key strings, overriding the
+built-in bindings for that scope. Collisions are reported by
+.BR "lb doctor" .
+.
+.SS [aliases]
+A table of user-defined command aliases.
+.
+.SS Example
+.RS 4
+.nf
+[general]
+actor = "leslie"
+use_git_identity = true
+stale_after = "2d"
+
+[workspace]
+focus_parent = "lb-epic-1"
+exclude_labels = ["wontfix", "icebox"]
+
+[ranking]
+strategy = "balanced"
+leverage_weight = 25
+max_graph_depth = 6
+
+[tui]
+show_descriptions = true
+.fi
+.RE
+.
+.SH DURATION SYNTAX
+Durations accept Go syntax
+.RB ( 300ms ", " 90s ", " 5m ", " 2h ,
+and combinations such as
+.BR 1h30m ),
+plus two extensions:
+.B d
+for days and
+.B w
+for weeks
+.RB ( 2d ", " 3w ).
+A bare number is read as seconds, so
+.B 30
+and
+.B 30s
+are the same.
+.PP
+The
+.BR \-\-since " and " \-\-recent
+flags additionally accept the literal
+.BR today ,
+meaning "since local midnight".
+.
+.SH ENVIRONMENT
+.TP
+.B LB_ACTOR
+Operator identity. Overrides configuration; overridden by
+.BR \-\-actor .
+.TP
+.B LB_BD_BIN
+Path to the
+.B bd
+executable.
+.TP
+.B LB_COLOR
+Color mode.
+.TP
+.B LB_PROJECT
+Repository path to resolve from.
+.TP
+.B LB_BEADS_DIR
+Explicit Beads directory.
+.TP
+.B LB_RIG
+Rig name.
+.TP
+.B LB_TIMEOUT
+Per-invocation timeout. An unparseable value is ignored rather than fatal.
+.TP
+.B LB_NO_CONFIRM
+Truthy
+.RB ( 1 ", " true ", " yes ", " on )
+disables mutation confirmation. This is deliberately environment-only: a
+project configuration file must never be able to silently disable confirmation
+for a repository you just cloned. When it is set and the session is
+interactive,
+.B lb
+warns before proceeding anyway.
+.TP
+.B LB_CONFIG
+Override the user configuration file path entirely.
+.TP
+.BR LB_CACHE_DIR ", " LB_DATA_DIR
+Override the cache and data directories.
+.TP
+.BR VISUAL ", " EDITOR
+Editor used by
+.BR "lb edit \-\-open\-in\-editor" .
+.B VISUAL
+is preferred. The value may carry arguments, for example
+.BR "code \-w" ;
+it is split on whitespace and executed as an argument vector, never through a
+shell.
+.TP
+.BR XDG_CONFIG_HOME ", " XDG_CACHE_HOME ", " XDG_DATA_HOME
+Consulted on Linux and other Unix systems for the paths under
+.BR FILES .
+.
+.SH FILES
+.TP
+.B .lazybeads.toml
+Project configuration, discovered by walking upward from the starting
+directory.
+.TP
+.I ~/.config/lazybeads/config.toml
+User configuration on Linux and Unix
+.RB ( $XDG_CONFIG_HOME/lazybeads/config.toml
+when set).
+.TP
+.I ~/Library/Application Support/lazybeads/config.toml
+User configuration on macOS.
+.TP
+.I %AppData%\eLazybeads\econfig.toml
+User configuration on Windows.
+.TP
+.I ~/.local/share/lazybeads/completions/
+Completion scripts written by
+.BR "lb doctor \-\-fix" .
+On macOS this is
+.IR "~/Library/Application Support/lazybeads/completions/" .
+.TP
+.I ~/.cache/lazybeads/
+Cache directory. On macOS,
+.IR ~/Library/Caches/lazybeads/ .
+.
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+Runtime error not covered by a more specific code.
+.TP
+.B 2
+Usage error: unknown command or flag, bad argument count, invalid value.
+.TP
+.B 3
+.B bd
+is unavailable: not on
+.BR PATH ,
+not executable, or it failed to start.
+.TP
+.B 4
+Workspace could not be resolved.
+.TP
+.B 5
+Schema mismatch: the
+.B bd
+output could not be decoded against the expected contract.
+.TP
+.B 6
+Capability missing: the installed
+.B bd
+does not support the requested operation. LazyBeads reports this rather than
+approximating the operation with something else.
+.TP
+.B 7
+Mutation rejected by Beads.
+.TP
+.B 8
+Confirmation declined by the operator.
+.TP
+.B 9
+Timed out.
+.TP
+.B 10
+Internal invariant violated. This is a bug; please report it.
+.
+.SH JSON OUTPUT
+With
+.BR \-\-json " or " "\-\-format json" ,
+every successful command emits one envelope:
+.PP
+.RS 4
+.nf
+{
+  "schema_version": 1,
+  "command": "ready",
+  "workspace": { "root_path": "/path/to/repo", "rig": null },
+  "data": { },
+  "warnings": [],
+  "generated_at": "2026-09-11T09:00:00Z"
+}
+.fi
+.RE
+.PP
+Failures emit an error envelope instead, on standard output, alongside the
+exit code:
+.PP
+.RS 4
+.nf
+{
+  "schema_version": 1,
+  "command": "claim",
+  "error": {
+    "code": "capability",
+    "message": "...",
+    "hint": "...",
+    "upstream_stderr": null
+  }
+}
+.fi
+.RE
+.PP
+.B schema_version
+is 1. Adding fields is backward compatible; renaming or removing one increments
+the version. Scripts should key off
+.B error.code
+and the exit status, not off message text.
+.B upstream_stderr
+carries the captured
+.B bd
+stderr when there was any.
+.PP
+.B \-\-format jsonl
+emits one JSON object per line for streaming consumers.
+.
+.SH MUTATION SAFETY
+Every mutation follows the same path: LazyBeads builds the exact
+.B bd
+argument vector, shows it to you, and only then runs it.
+.PP
+The confirmation prompt names the workspace, the issue id and title, the full
+command, and any warnings, for example that the issue is already claimed by
+somebody else:
+.PP
+.RS 4
+.nf
+[y] Confirm  [n] Cancel  [v] View raw command:
+.fi
+.RE
+.PP
+.B v
+prints the argument vector and asks again. Declining exits 8.
+.PP
+Confirmation is skipped when
+.B \-\-yes
+is given, when
+.B \-\-dry\-run
+is given (nothing is executed at all), or when it has been disabled through
+.B general.confirm_mutations
+or
+.BR LB_NO_CONFIRM .
+In a non-interactive context with none of those, a mutation is refused with a
+usage error rather than proceeding unattended.
+.PP
+Arguments are passed to
+.B bd
+as a vector. No shell is involved at any point, so issue titles, labels, and
+reasons containing shell metacharacters are safe. All text originating from
+Beads is sanitised of control sequences before being written to the terminal.
+.
+.SH INTERACTIVE INTERFACE
+.B lb tui
+(or plain
+.B lb
+on a terminal) opens a tiled console: a stats header, context tabs, a list
+panel beside a live preview, and a keybinding bar. Below roughly 100 columns
+the preview pane hides itself.
+.
+.SS Keys
+.TP
+.BR j ", " k ", arrows"
+Move.
+.TP
+.B tab
+Move focus between the list and the preview pane. With the preview focused,
+the motion keys scroll it.
+.TP
+.BR ctrl+d ", " ctrl+u ", " pgdn ", " pgup
+Half-page down and up.
+.TP
+.BR G ", " end ", " home
+Last and first item.
+.TP
+.B enter
+Open the issue detail view.
+.TP
+.B esc
+Back, clear the filter, or cancel an overlay.
+.TP
+.B q
+Back; quit at the top level.
+.TP
+.BR r ", " f ", " b ", " i ", " a ", " m ", " h
+Switch to Ready, Focus, Blocked, Issues, Activity, Memory, or Health.
+.TP
+.B g
+Dependency graph for the selected issue.
+.TP
+.BR c ", " u ", " x ", " n
+Claim, unclaim, close, create. All confirm; close asks for a reason first.
+.TP
+.B /
+Filter. See
+.BR "Filter grammar" .
+.TP
+.BR [ ", " ]
+Cycle the status filter forward and backward in the Issues view:
+open, in_progress, blocked, deferred, closed, and back to all.
+.TP
+.B :
+Command palette.
+.TP
+.B R
+Refresh.
+.TP
+.B ?
+Help overlay.
+.TP
+.BR y ", " Y
+Copy the selected issue id, or
+.BI "lb show " id ,
+to the system clipboard. Native clipboard tools are used where available, with
+an OSC 52 escape fallback so it also works over SSH.
+.
+.SS Filter grammar
+The
+.B /
+overlay accepts a bare status word
+.RB ( open ", " closed ", " in_progress ", " blocked ", " deferred ),
+the same word prefixed with
+.BR status: " or " is: ,
+or any other text, which becomes a substring match across id, title, status,
+and labels. Hyphens and underscores are interchangeable, and matching is
+case-insensitive.
+.
+.SS Command palette
+The
+.B :
+overlay accepts
+.BR ready ", " focus ", " blocked ", " issues ", " activity ", " memory ", "
+.BR health " (also " doctor " or " status ), " help ", " claim ", " refresh ", and"
+.BR quit " (or " q ).
+Commands match on prefix.
+.PP
+The TUI calls exactly the same service layer as the command line. There is no
+behaviour available in one and not the other, and mutations confirm in both.
+.
+.SH SHELL COMPLETION
+.B lb completion
+writes a script to standard output:
+.PP
+.RS 4
+.nf
+lb completion bash > /usr/local/etc/bash_completion.d/lb
+lb completion zsh  > "${fpath[1]}/_lb"
+lb completion fish > ~/.config/fish/completions/lb.fish
+.fi
+.RE
+.PP
+.B make install
+installs all three under the chosen prefix.
+.B lb doctor \-\-fix
+writes them into the user data directory instead and tells you where; it does
+not edit rc files on your behalf.
+.
+.SH EXAMPLES
+Find something to work on, and understand the choice:
+.PP
+.RS 4
+.nf
+lb next \-\-verbose
+lb why lb\-42
+.fi
+.RE
+.PP
+Claim it and close it later with a reason:
+.PP
+.RS 4
+.nf
+lb claim lb\-42
+lb close lb\-42 "fixed in 7886551; regression test added"
+.fi
+.RE
+.PP
+See what the command would be, without running it:
+.PP
+.RS 4
+.nf
+lb close lb\-42 \-\-reason done \-\-dry\-run
+.fi
+.RE
+.PP
+Unattended use in a script:
+.PP
+.RS 4
+.nf
+lb ready \-\-json \-\-priority\-max 1 | jq \-r '.data.issues[].id'
+lb claim lb\-42 \-\-yes \-\-json
+.fi
+.RE
+.PP
+What is blocking the most work:
+.PP
+.RS 4
+.nf
+lb blocked \-\-group\-by blocker
+lb graph lb\-7 \-\-direction dependents \-\-format dot | dot \-Tpng > deps.png
+.fi
+.RE
+.PP
+Who is sitting on stale claims:
+.PP
+.RS 4
+.nf
+lb stale \-\-since 3d \-\-claimed\-only
+lb activity \-\-since today \-\-actor leslie
+.fi
+.RE
+.PP
+Diagnose an installation:
+.PP
+.RS 4
+.nf
+lb doctor \-\-verbose
+lb doctor \-\-fix
+lb \-\-debug status
+.fi
+.RE
+.
+.SH SEE ALSO
+.BR bd (1),
+.BR dolt (1),
+.BR git (1),
+.BR dot (1)
+.PP
+Beads sync concepts:
+.UR https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md
+SYNC_CONCEPTS.md
+.UE
+.PP
+LazyBeads documentation:
+.IR docs/architecture.md ,
+.IR docs/configuration.md ,
+.IR docs/keybindings.md ,
+.IR docs/compatibility.md ,
+.IR docs/security.md .
+.
+.SH BUGS
+Report issues at
+.UR https://github.com/lesliesrussell/lazybeads
+github.com/lesliesrussell/lazybeads
+.UE .
+.PP
+An exit status of 10 always indicates a LazyBeads bug rather than a problem
+with your workspace.
+.
+.SH AUTHOR
+Leslie Russell.
