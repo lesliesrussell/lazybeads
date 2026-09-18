@@ -3,6 +3,7 @@ package beads
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -61,12 +62,52 @@ func (e *CommandError) Unwrap() error { return e.Cause }
 
 // upstreamMessage extracts the most useful single line from bd's stderr.
 func (e *CommandError) upstreamMessage() string {
-	for _, line := range strings.Split(e.Stderr, "\n") {
+	return upstreamMessage(e.Stderr)
+}
+
+// upstreamMessage reduces bd's stderr to one human-readable line. Under
+// --json, bd reports failures as an error envelope on stderr, so the first
+// line is a bare "{"; unwrap the envelope before falling back to plain text.
+// lb-2w3
+func upstreamMessage(stderr string) string {
+	if msg := jsonEnvelopeMessage(stderr); msg != "" {
+		return msg
+	}
+	for _, line := range strings.Split(stderr, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
 		return strings.TrimPrefix(strings.TrimPrefix(line, "Error: "), "error: ")
+	}
+	return ""
+}
+
+// jsonEnvelopeMessage pulls the message out of bd's JSON error envelope.
+// Anything that is not such an envelope yields "" so the caller falls back to
+// the raw text.
+// lb-2w3
+func jsonEnvelopeMessage(stderr string) string {
+	trimmed := strings.TrimSpace(stderr)
+	if !strings.HasPrefix(trimmed, "{") {
+		return ""
+	}
+	var envelope struct {
+		Error   string `json:"error"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal([]byte(trimmed), &envelope); err != nil {
+		return ""
+	}
+	msg := strings.TrimSpace(firstNonEmptyString(envelope.Error, envelope.Message))
+	return strings.TrimPrefix(strings.TrimPrefix(msg, "Error: "), "error: ")
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
 	}
 	return ""
 }
@@ -177,11 +218,16 @@ func classifyStderr(stderr string, exitCode int, ctxErr error) ErrorKind {
 	if errors.Is(ctxErr, context.Canceled) {
 		return ErrCancelled
 	}
+	// bd's --json failures arrive as an error envelope, so classify the
+	// message it carries rather than the surrounding braces. lb-2w3
 	s := strings.ToLower(stderr)
+	if msg := jsonEnvelopeMessage(stderr); msg != "" {
+		s = strings.ToLower(msg)
+	}
 	switch {
 	case containsAny(s, "schema version", "schema skew", "schema mismatch", "migrate"):
 		return ErrSchemaMismatch
-	case containsAny(s, "no beads database", "not a beads", "no .beads", "beads not initialized", "could not find .beads", "no database found"):
+	case containsAny(s, "no beads database", "no beads project", "not a beads", "no .beads", "beads not initialized", "could not find .beads", "no database found"):
 		return ErrWorkspaceNotFound
 	case containsAny(s, "not found", "no such issue", "does not exist", "unknown issue"):
 		return ErrNotFound

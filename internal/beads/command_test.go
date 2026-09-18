@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/lesliesrussell/lazybeads/internal/domain"
 )
 
 func TestRedactArgs(t *testing.T) {
@@ -139,5 +141,34 @@ func TestTimeoutClassification(t *testing.T) {
 	}
 	if ce.ExitCode2() != 9 {
 		t.Errorf("exit code = %d, want 9", ce.ExitCode2())
+	}
+}
+
+// lb-2w3
+func TestUpstreamMessageUnwrapsJSONErrorEnvelope(t *testing.T) {
+	stderr := "{\n  \"error\": \"cannot use -C directory \\\"/tmp/x\\\": no beads project found\",\n  \"schema_version\": 1\n}\n"
+	ce := &CommandError{Kind: ErrBDExecution, Operation: "info", ExitCode: 1, Stderr: stderr}
+	got := ce.upstreamMessage()
+	want := "cannot use -C directory \"/tmp/x\": no beads project found"
+	if got != want {
+		t.Errorf("upstreamMessage() = %q, want %q", got, want)
+	}
+}
+
+// lb-2w3
+func TestClassifyStderrJSONEnvelopeWorkspaceMissing(t *testing.T) {
+	stderr := "{\n  \"error\": \"cannot use -C directory \\\"/tmp/x\\\": no beads project found\",\n  \"schema_version\": 1\n}\n"
+	if got := classifyStderr(stderr, 1, nil); got != ErrWorkspaceNotFound {
+		t.Errorf("classifyStderr(json envelope) = %q, want %q", got, ErrWorkspaceNotFound)
+	}
+	ce := &CommandError{Kind: ErrWorkspaceNotFound, Operation: "info", ExitCode: 1, Stderr: stderr}
+	if ce.ExitCode2() != domain.ExitWorkspace {
+		t.Errorf("exit code = %d, want %d", ce.ExitCode2(), domain.ExitWorkspace)
+	}
+	if msg := ce.Message(); msg != "No Beads workspace was found from this directory." {
+		t.Errorf("Message() = %q", msg)
+	}
+	if hint := ce.UserHint(); hint == "" {
+		t.Error("a missing workspace must carry a recovery hint")
 	}
 }
