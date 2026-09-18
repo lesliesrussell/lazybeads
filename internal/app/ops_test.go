@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lesliesrussell/lazybeads/internal/config"
 	"github.com/lesliesrussell/lazybeads/internal/domain"
 )
 
@@ -134,5 +135,86 @@ func TestDoctorFixCreatesCache(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(tmp, "cfg", "config.toml")); err != nil {
 		t.Fatalf("config: %v", err)
+	}
+}
+
+// stubBD installs an executable named bd on PATH that answers `bd version
+// --json`, so doctor can be exercised without a real Beads install. lb-dhv
+func stubBD(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bd")
+	script := "#!/bin/sh\nfor a in \"$@\"; do\n  if [ \"$a\" = \"version\" ]; then\n    echo '{\"version\":\"1.0.5\",\"schema_version\":1}'\n    exit 0\n  fi\ndone\necho 'Error: no beads database found' >&2\nexit 1\n"
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatalf("write stub bd: %v", err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return path
+}
+
+func doctorCheck(t *testing.T, report *DoctorReport, name string) domain.HealthCheck {
+	t.Helper()
+	for _, c := range report.Health.Checks {
+		if c.Name == name {
+			return c
+		}
+	}
+	t.Fatalf("missing %q check: %+v", name, report.Health.Checks)
+	return domain.HealthCheck{}
+}
+
+// lb-dhv
+func TestDoctorWithoutClientDoesNotBlameMissingBDWhenBDExists(t *testing.T) {
+	stubBD(t)
+	svc := &Service{Config: config.Default()}
+	got, err := svc.Doctor(context.Background(), DoctorRequest{})
+	if err != nil {
+		t.Fatalf("Doctor: %v", err)
+	}
+	for _, c := range got.Health.Checks {
+		if strings.Contains(c.Summary, "was not found") {
+			t.Errorf("doctor claims bd is missing while bd is on PATH: %+v", c)
+		}
+	}
+	version := doctorCheck(t, got, "bd_version")
+	if version.Level == domain.HealthError {
+		t.Errorf("bd_version = %+v, want a readable version", version)
+	}
+	if got.BDVersion != "1.0.5" {
+		t.Errorf("BDVersion = %q, want 1.0.5", got.BDVersion)
+	}
+}
+
+// lb-dhv
+func TestDoctorWithoutClientStillReportsMissingBD(t *testing.T) {
+	cfg := config.Default()
+	cfg.General.BDBinary = "lb-test-no-such-beads-binary"
+	got, err := (&Service{Config: cfg}).Doctor(context.Background(), DoctorRequest{})
+	if err != nil {
+		t.Fatalf("Doctor: %v", err)
+	}
+	check := doctorCheck(t, got, "bd")
+	if check.Level != domain.HealthError {
+		t.Errorf("bd check = %+v, want error", check)
+	}
+	if !strings.Contains(check.Summary, "was not found") {
+		t.Errorf("summary = %q, want a not-found diagnosis", check.Summary)
+	}
+}
+
+// Schema and JSON decoding cannot be judged without a workspace; doctor must
+// say so rather than report a parse failure it never observed. lb-dhv
+func TestDoctorWithoutClientDoesNotInventSchemaFailure(t *testing.T) {
+	stubBD(t)
+	got, err := (&Service{Config: config.Default()}).Doctor(context.Background(), DoctorRequest{})
+	if err != nil {
+		t.Fatalf("Doctor: %v", err)
+	}
+	for _, name := range []string{"schema", "json_parse"} {
+		for _, c := range got.Health.Checks {
+			if c.Name == name && c.Level == domain.HealthError {
+				t.Errorf("%s reported as error without a workspace: %+v", name, c)
+			}
+		}
 	}
 }

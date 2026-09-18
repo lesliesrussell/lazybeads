@@ -17,6 +17,59 @@ import (
 	"github.com/lesliesrussell/lazybeads/internal/workspace"
 )
 
+// offlineBDChecks diagnoses bd when setup failed before a client could be
+// built. A nil client says nothing about the binary: bd resolves and reports
+// its version without a workspace, so probe it directly instead of blaming it
+// for a failure that belongs to workspace resolution. Schema and JSON
+// decoding genuinely cannot be judged from here, so they are reported as
+// unchecked rather than guessed. lb-dhv
+func (s *Service) offlineBDChecks(ctx context.Context, report *DoctorReport) []domain.HealthCheck {
+	binary := strings.TrimSpace(s.Config.General.BDBinary)
+	if binary == "" {
+		binary = "bd"
+	}
+	runner := beads.NewRunner(binary)
+	path, err := runner.Resolve()
+	if err != nil {
+		return []domain.HealthCheck{{
+			Name: "bd", Level: domain.HealthError,
+			Summary: "Beads CLI (`bd`) was not found.",
+			Detail:  "looked for " + binary,
+			Hint:    "Install Beads or set LB_BD_BIN.",
+		}}
+	}
+
+	checks := []domain.HealthCheck{}
+	v, verr := beads.NewCLI(runner, s.Actor).Version(ctx, beads.Scope{})
+	if verr != nil {
+		checks = append(checks, domain.HealthCheck{
+			Name: "bd_version", Level: domain.HealthError,
+			Summary: "bd version is not readable",
+			Detail:  verr.Error(),
+			Hint:    "Install Beads or set LB_BD_BIN.",
+		})
+	} else {
+		report.BDVersion = v.Version
+		level := domain.HealthOK
+		hint := ""
+		if !supportedBD(v.Version) {
+			level = domain.HealthWarning
+			hint = "LazyBeads is tested against Beads 1.0.x; continue with capability gating."
+		}
+		checks = append(checks, domain.HealthCheck{
+			Name: "bd_version", Level: level,
+			Summary: "Beads " + v.Version,
+			Detail:  path,
+			Hint:    hint,
+		})
+	}
+
+	return append(checks, domain.HealthCheck{
+		Name: "schema", Level: domain.HealthInfo,
+		Summary: "Schema not checked: no workspace was resolved",
+	})
+}
+
 // DoctorRequest controls `lb doctor`.
 type DoctorRequest struct {
 	Fix     bool
@@ -89,11 +142,7 @@ func (s *Service) Doctor(ctx context.Context, req DoctorRequest) (*DoctorReport,
 			})
 		}
 	} else {
-		h.Checks = append(h.Checks, domain.HealthCheck{
-			Name: "bd", Level: domain.HealthError,
-			Summary: "Beads CLI (`bd`) was not found.",
-			Hint:    "Install Beads or set LB_BD_BIN.",
-		})
+		h.Checks = append(h.Checks, s.offlineBDChecks(ctx, report)...)
 	}
 
 	if s.Workspace.RootPath == "" && s.Workspace.BeadsDir == "" {
