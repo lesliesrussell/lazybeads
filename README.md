@@ -2,6 +2,8 @@
 
 The terminal operator console for [Beads](https://github.com/gastownhall/beads).
 
+![The LazyBeads TUI: the Issues tab, with the selected bead previewed beside the list](screenshot.png)
+
 `bd` is the database, graph, and atomic coordination layer. `lb` is attention management: rank, explain, navigate, and mutate through `bd` only — never by writing `.beads/` itself.
 
 ```sh
