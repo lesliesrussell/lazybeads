@@ -5,6 +5,9 @@
 *.test
 .beads/embeddeddolt/
 .beads/*.db
+# lb-eu1: derived export of the interactions table; Dolt (refs/dolt/data) is
+# the source of truth and bd rewrites this on ordinary use.
+.beads/interactions.jsonl
 .omc/state/
 .DS_Store
 
