@@ -1,4 +1,4 @@
-lazybeads 0.1.0 · doctor
+lazybeads 0.2.0 · doctor
 Health: - info
 
 + bd_version  Beads 1.0.5

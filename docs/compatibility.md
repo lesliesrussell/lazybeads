@@ -17,10 +17,10 @@ Each Beads clone has its own journal sequence, and syncs (`bd dolt pull`) are no
 
 | LazyBeads | Beads | Status |
 |---|---|---|
-| 0.1.x | 1.0.x | Tested. Fixtures under `internal/beads/testdata/bd-1.0.5/`. |
-| 0.1.x | 1.3.x | Tested. Fixtures under `internal/beads/testdata/bd-1.3.0/`. |
-| 0.1.x | other 1.x | Used through capability probing. `lb doctor` warns and continues. |
-| 0.1.x | 0.x / unknown | Error if `bd` cannot run or JSON cannot be parsed. Schema mismatch is exit **5**. |
+| 0.1.x–0.2.x | 1.0.x | Tested. Fixtures under `internal/beads/testdata/bd-1.0.5/`. |
+| 0.1.x–0.2.x | 1.3.x | Tested. Fixtures under `internal/beads/testdata/bd-1.3.0/`. |
+| 0.1.x–0.2.x | other 1.x | Used through capability probing. `lb doctor` warns and continues. |
+| 0.1.x–0.2.x | 0.x / unknown | Error if `bd` cannot run or JSON cannot be parsed. Schema mismatch is exit **5**. |
 
 `lb version` prints the LazyBeads identifier. Release binaries inject that identifier via GoReleaser ldflags.
 

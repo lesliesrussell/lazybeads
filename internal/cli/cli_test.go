@@ -14,6 +14,7 @@ import (
 	"github.com/lesliesrussell/lazybeads/internal/beads"
 	"github.com/lesliesrussell/lazybeads/internal/config"
 	"github.com/lesliesrussell/lazybeads/internal/domain"
+	"github.com/lesliesrussell/lazybeads/internal/version"
 	"github.com/lesliesrussell/lazybeads/internal/workspace"
 )
 
@@ -144,7 +145,7 @@ func TestVersionPrintsProductVersion(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d, stdout=%s", code, out)
 	}
-	if !strings.Contains(out, "lazybeads 0.1.0") {
+	if !strings.Contains(out, "lazybeads "+version.Version) {
 		t.Errorf("version = %q", out)
 	}
 }
