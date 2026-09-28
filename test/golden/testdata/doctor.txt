@@ -5,6 +5,7 @@ Health: - info
 + json_parse  Beads JSON output decodes
 + schema  Beads schema is compatible (tested 1.0.x–1.3.x)
 - transport  One-shot commands use the bd CLI
++ events_journal  Events journal is on; live views follow it
 + workspace  Workspace /fake
 + actor  Actor operator
 - config  Using built-in defaults (no config file)

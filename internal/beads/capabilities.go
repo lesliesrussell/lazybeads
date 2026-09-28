@@ -23,6 +23,10 @@ type Capabilities struct {
 	Reopen              bool `json:"reopen"`
 	Unclaim             bool `json:"unclaim"`
 	CustomMetadata      bool `json:"custom_metadata"`
+	// EventsJournal is `bd events tail --follow` (Beads 1.3.0+). Whether the
+	// journal is switched on is a workspace setting checked separately.
+	// lb-4gm.4
+	EventsJournal bool `json:"events_journal"`
 
 	// Version is the detected bd version, when readable.
 	Version string `json:"version,omitempty"`
@@ -54,6 +58,8 @@ func (c Capabilities) Has(name string) bool {
 		return c.Unclaim
 	case "metadata", "custom_metadata":
 		return c.CustomMetadata
+	case "events", "events_journal": // lb-4gm.4
+		return c.EventsJournal
 	}
 	return false
 }
@@ -129,6 +135,10 @@ func (c *CLI) probeCapabilities(ctx context.Context, scope Scope) Capabilities {
 
 	depHelp := help("dep", "add")
 	caps.DependencyRelations = strings.Contains(depHelp, "--type")
+
+	// lb-4gm.4
+	tailHelp := help("events", "tail")
+	caps.EventsJournal = strings.Contains(tailHelp, "--follow") && strings.Contains(tailHelp, "--since")
 
 	rootHelp := help()
 	caps.EventHistory = strings.Contains(rootHelp, "history")

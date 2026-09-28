@@ -1,0 +1,1 @@
+note: the events journal is disabled for this workspace (enable with 'bd config set events-journal true'); any records shown were written while it was enabled, and new mutations are not being recorded

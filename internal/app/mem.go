@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/lesliesrussell/lazybeads/internal/beads"
@@ -30,6 +31,79 @@ type MemClient struct {
 	// WorkspaceCtx is what WorkspaceContext reports (embedded by default).
 	// lb-4gm.3
 	WorkspaceCtx beads.WorkspaceContext
+
+	// journal is an in-memory events journal; JournalOff makes it behave
+	// like a workspace with the journal disabled.
+	// lb-4gm.4
+	journalMu  sync.Mutex
+	journal    []beads.JournalRecord
+	journalCh  chan struct{}
+	JournalOff bool
+}
+
+// AppendJournal commits a record to the in-memory journal, assigning the next
+// seq, and wakes any follower.
+// lb-4gm.4
+func (f *MemClient) AppendJournal(rec beads.JournalRecord) beads.JournalRecord {
+	f.journalMu.Lock()
+	defer f.journalMu.Unlock()
+	rec.Seq = int64(len(f.journal)) + 1
+	f.journal = append(f.journal, rec)
+	if f.journalCh != nil {
+		close(f.journalCh)
+		f.journalCh = nil
+	}
+	return rec
+}
+
+// JournalRead returns records after since, up to limit (0 = all).
+// lb-4gm.4
+func (f *MemClient) JournalRead(_ context.Context, since int64, limit int, _ beads.Scope) ([]beads.JournalRecord, error) {
+	if f.JournalOff {
+		return nil, &beads.CommandError{Kind: beads.ErrJournalDisabled, Operation: "events tail"}
+	}
+	f.journalMu.Lock()
+	defer f.journalMu.Unlock()
+	var out []beads.JournalRecord
+	for _, r := range f.journal {
+		if r.Seq > since && (limit <= 0 || len(out) < limit) {
+			out = append(out, r)
+		}
+	}
+	return out, nil
+}
+
+// JournalFollow delivers records after since and then each appended one,
+// until ctx ends.
+// lb-4gm.4
+func (f *MemClient) JournalFollow(ctx context.Context, since int64, scope beads.Scope, fn beads.JournalFunc) error {
+	for {
+		records, err := f.JournalRead(ctx, since, 0, scope)
+		if err != nil {
+			return err
+		}
+		for _, r := range records {
+			if err := fn(r); err != nil {
+				return err
+			}
+			since = r.Seq
+		}
+		f.journalMu.Lock()
+		if int64(len(f.journal)) > since {
+			f.journalMu.Unlock()
+			continue
+		}
+		if f.journalCh == nil {
+			f.journalCh = make(chan struct{})
+		}
+		wake := f.journalCh
+		f.journalMu.Unlock()
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-wake:
+		}
+	}
 }
 
 // WorkspaceContext reports the configured storage mode.
@@ -475,6 +549,7 @@ func (f *MemClient) Capabilities(context.Context, beads.Scope) beads.Capabilitie
 		JSONOutput: true, AtomicClaim: true, DependencyRelations: true,
 		EventHistory: true, MemoryCommands: true, Reopen: true, Unclaim: true,
 		CustomMetadata: true, Version: "1.0.5",
+		EventsJournal: true, // lb-4gm.4
 	}
 }
 

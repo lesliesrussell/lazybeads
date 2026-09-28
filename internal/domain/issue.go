@@ -178,6 +178,10 @@ type Issue struct {
 
 	// BlockedBy lists blocker IDs when the upstream command reports them.
 	BlockedBy []string `json:"blocked_by,omitempty"`
+	// IsBlocked is Beads' own blocked verdict. The events journal and bd
+	// serve send it only when true, so false also means "not reported".
+	// lb-4gm.4
+	IsBlocked bool `json:"is_blocked,omitempty"`
 
 	Raw json.RawMessage `json:"-"`
 }

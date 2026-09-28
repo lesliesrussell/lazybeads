@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/lesliesrussell/lazybeads/internal/domain"
 )
@@ -77,6 +78,10 @@ type HTTP struct {
 	hc        *http.Client
 	info      ServerInfo
 	caps      map[string]bool
+
+	// PollInterval paces journal polling when events:watch is refused.
+	// lb-4gm.4
+	PollInterval time.Duration
 }
 
 // NewHTTP connects to a `bd serve` and reads what it supports. It fails with

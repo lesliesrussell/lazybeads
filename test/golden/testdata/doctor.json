@@ -31,6 +31,11 @@
           "detail": "bd serve needs a Dolt server; this workspace uses embedded Dolt, so the TUI uses the bd CLI too"
         },
         {
+          "name": "events_journal",
+          "level": "ok",
+          "summary": "Events journal is on; live views follow it"
+        },
+        {
           "name": "workspace",
           "level": "ok",
           "summary": "Workspace /fake",

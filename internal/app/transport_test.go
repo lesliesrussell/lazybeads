@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/lesliesrussell/lazybeads/internal/beads"
+	"github.com/lesliesrussell/lazybeads/internal/domain"
 )
 
 // fixtureProject is the project_id recorded in http/context.json.
@@ -164,5 +165,30 @@ func TestConnectServeNeedsProjectIDsForAConfiguredServer(t *testing.T) {
 	svc.ConnectServe(context.Background(), false)()
 	if svc.Transport.Kind != "cli" {
 		t.Errorf("a server that hides its project was trusted: %+v", svc.Transport)
+	}
+}
+
+// lb-4gm.4
+func TestDoctorReportsJournalState(t *testing.T) {
+	check := func(f *MemClient) domain.HealthCheck {
+		got, err := newTestService(f).Doctor(context.Background(), DoctorRequest{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range got.Health.Checks {
+			if c.Name == "events_journal" {
+				return c
+			}
+		}
+		t.Fatal("no events_journal check")
+		return domain.HealthCheck{}
+	}
+	if c := check(newFakeClient()); c.Level != domain.HealthOK {
+		t.Errorf("on = %+v", c)
+	}
+	off := newFakeClient()
+	off.JournalOff = true
+	if c := check(off); c.Level != domain.HealthInfo || !strings.Contains(c.Hint, "bd config set events-journal true") {
+		t.Errorf("off = %+v", c)
 	}
 }

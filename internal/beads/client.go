@@ -44,6 +44,12 @@ type Client interface {
 	Forget(ctx context.Context, id string, scope Scope) error
 
 	History(ctx context.Context, id string, scope Scope) ([]domain.Event, error)
+	// JournalRead returns events journal records after since, up to limit
+	// (0 = all); JournalFollow then keeps delivering new ones until ctx ends.
+	// Both fail with ErrJournalDisabled or ErrJournalTruncated.
+	// lb-4gm.4
+	JournalRead(ctx context.Context, since int64, limit int, scope Scope) ([]JournalRecord, error)
+	JournalFollow(ctx context.Context, since int64, scope Scope, fn JournalFunc) error
 	SyncStatus(ctx context.Context, scope Scope) (domain.SyncStatus, error)
 
 	Capabilities(ctx context.Context, scope Scope) Capabilities

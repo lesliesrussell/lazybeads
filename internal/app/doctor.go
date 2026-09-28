@@ -4,6 +4,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -142,6 +143,7 @@ func (s *Service) Doctor(ctx context.Context, req DoctorRequest) (*DoctorReport,
 			})
 		}
 		h.Checks = append(h.Checks, s.transportCheck(ctx)) // lb-4gm.3
+		h.Checks = append(h.Checks, s.journalCheck(ctx))   // lb-4gm.4
 	} else {
 		h.Checks = append(h.Checks, s.offlineBDChecks(ctx, report)...)
 	}
@@ -375,6 +377,36 @@ func (s *Service) transportCheck(ctx context.Context) domain.HealthCheck {
 		check.Detail = "The TUI and --watch start bd serve for this " + wc.DoltMode + " workspace"
 	default:
 		check.Detail = "bd serve needs a Dolt server; this workspace uses " + modeName(wc.DoltMode) + " Dolt, so the TUI uses the bd CLI too"
+	}
+	return check
+}
+
+// journalCheck reports whether the Beads events journal can drive live
+// updates. LazyBeads never switches it on: that changes what every bd command
+// in the workspace records, agents' included.
+// lb-4gm.4
+func (s *Service) journalCheck(ctx context.Context) domain.HealthCheck {
+	check := domain.HealthCheck{Name: "events_journal", Level: domain.HealthInfo}
+	if !s.Client.Capabilities(ctx, s.Scope()).EventsJournal {
+		check.Summary = "This bd has no events journal; live views poll instead"
+		check.Hint = "Beads 1.3.0 adds `bd events`."
+		return check
+	}
+	// Nothing lies above the largest seq, so this reads no records: it only
+	// asks whether the journal is on.
+	_, err := s.Client.JournalRead(ctx, math.MaxInt64>>1, 1, s.Scope())
+	ce, _ := beads.AsCommandError(err)
+	switch {
+	case err == nil:
+		check.Level = domain.HealthOK
+		check.Summary = "Events journal is on; live views follow it"
+	case ce != nil && ce.Kind == beads.ErrJournalDisabled:
+		check.Summary = "Events journal is off; live views poll instead"
+		check.Hint = "Turn it on for this workspace with `bd config set events-journal true` (every bd command, agents included, is then journaled)."
+	default:
+		check.Level = domain.HealthWarning
+		check.Summary = "Events journal could not be read"
+		check.Detail = err.Error()
 	}
 	return check
 }

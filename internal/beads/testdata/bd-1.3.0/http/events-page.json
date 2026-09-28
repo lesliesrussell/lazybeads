@@ -1,0 +1,59 @@
+{
+  "head": 114,
+  "records": [
+    {
+      "seq": 1,
+      "ts": "2026-09-28T13:46:12Z",
+      "op": "create",
+      "issue_id": "sv-379",
+      "actor": "fixture",
+      "issue": {
+        "id": "sv-379",
+        "title": "Alpha task",
+        "status": "open",
+        "priority": 1,
+        "issue_type": "task",
+        "owner": "fixture@example.com",
+        "created_at": "2026-09-28T13:46:12Z",
+        "created_by": "fixture",
+        "updated_at": "2026-09-28T13:46:12Z"
+      }
+    },
+    {
+      "seq": 2,
+      "ts": "2026-09-28T13:46:12Z",
+      "op": "create",
+      "issue_id": "sv-q59",
+      "actor": "fixture",
+      "issue": {
+        "id": "sv-q59",
+        "title": "Beta bug",
+        "status": "open",
+        "priority": 2,
+        "issue_type": "bug",
+        "owner": "fixture@example.com",
+        "created_at": "2026-09-28T13:46:12Z",
+        "created_by": "fixture",
+        "updated_at": "2026-09-28T13:46:12Z"
+      }
+    },
+    {
+      "seq": 3,
+      "ts": "2026-09-28T13:46:12Z",
+      "op": "create",
+      "issue_id": "sv-65q",
+      "actor": "fixture",
+      "issue": {
+        "id": "sv-65q",
+        "title": "Gamma closed",
+        "status": "open",
+        "priority": 3,
+        "issue_type": "task",
+        "owner": "fixture@example.com",
+        "created_at": "2026-09-28T13:46:12Z",
+        "created_by": "fixture",
+        "updated_at": "2026-09-28T13:46:12Z"
+      }
+    }
+  ]
+}

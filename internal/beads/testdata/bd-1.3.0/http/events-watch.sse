@@ -1,0 +1,11 @@
+retry: 3000
+
+id: 1
+data: {"seq":1,"ts":"2026-09-28T13:46:12Z","op":"create","issue_id":"sv-379","actor":"fixture","issue":{"id":"sv-379","title":"Alpha task","status":"open","priority":1,"issue_type":"task","owner":"fixture@example.com","created_at":"2026-09-28T13:46:12Z","created_by":"fixture","updated_at":"2026-09-28T13:46:12Z"}}
+
+id: 2
+data: {"seq":2,"ts":"2026-09-28T13:46:12Z","op":"create","issue_id":"sv-q59","actor":"fixture","issue":{"id":"sv-q59","title":"Beta bug","status":"open","priority":2,"issue_type":"bug","owner":"fixture@example.com","created_at":"2026-09-28T13:46:12Z","created_by":"fixture","updated_at":"2026-09-28T13:46:12Z"}}
+
+id: 115
+data: {"seq":115,"ts":"2026-09-28T14:12:00Z","op":"update","issue_id":"sv-kk9","actor":"fixture","issue":{"id":"sv-kk9","title":"Delta ready","status":"open","priority":1,"issue_type":"task","owner":"fixture@example.com","created_at":"2026-09-28T13:46:12Z","created_by":"fixture","updated_at":"2026-09-28T14:12:00Z","labels":["ui"]}}
+

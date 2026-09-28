@@ -20,6 +20,8 @@ type rawIssue struct {
 	Description string `json:"description"`
 
 	Status string `json:"status"`
+	// lb-4gm.4
+	IsBlocked bool `json:"is_blocked"`
 
 	IssueType string `json:"issue_type"`
 	AltType   string `json:"type"`
@@ -178,6 +180,7 @@ func (r rawIssue) toIssue() domain.Issue {
 		DependentCount:  r.DependentCount,
 		CommentCount:    r.CommentCount,
 		BlockedBy:       r.BlockedBy,
+		IsBlocked:       r.IsBlocked, // lb-4gm.4
 	}
 
 	if owner := firstNonEmpty(r.Assignee, r.Owner); owner != "" {
