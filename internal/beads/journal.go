@@ -300,3 +300,33 @@ func JournalHead(ctx context.Context, c Client, scope Scope) (int64, error) {
 	}
 	return recs[len(recs)-1].Seq, nil
 }
+
+// JournalTail returns up to n of the most recent journal records, oldest
+// first. knownHead, when positive, saves looking the head up (a live mirror
+// knows it). Records pruned by retention are skipped, not an error.
+// lb-4gm.7
+func JournalTail(ctx context.Context, c Client, scope Scope, n int, knownHead int64) ([]JournalRecord, error) {
+	head := knownHead
+	if head <= 0 {
+		if hr, ok := c.(headReader); ok {
+			if h, err := hr.journalHead(ctx, scope); err == nil {
+				head = h
+			}
+		}
+	}
+	since := int64(0)
+	if head > 0 && head > int64(n) {
+		since = head - int64(n)
+	}
+	recs, err := c.JournalRead(ctx, since, 0, scope)
+	if ce, ok := AsCommandError(err); ok && ce.Kind == ErrJournalTruncated && ce.Problem != nil && ce.Problem.Floor > 0 {
+		recs, err = c.JournalRead(ctx, ce.Problem.Floor-1, 0, scope)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(recs) > n {
+		recs = recs[len(recs)-n:]
+	}
+	return recs, nil
+}

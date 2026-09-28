@@ -9,6 +9,7 @@ import (
 
 	"github.com/lesliesrussell/lazybeads/internal/beads"
 	"github.com/lesliesrussell/lazybeads/internal/domain"
+	"github.com/lesliesrussell/lazybeads/internal/mirror"
 )
 
 // FocusRequest selects whose work `lb focus` should emphasize.
@@ -162,6 +163,10 @@ type ActivityRequest struct {
 type ActivityResult struct {
 	Events []domain.Event `json:"events"`
 	Since  string         `json:"since,omitempty"`
+	// Source is "journal" when the Beads events journal answered, or
+	// "history" when per-issue `bd history` did.
+	// lb-4gm.7
+	Source string `json:"source,omitempty"`
 }
 
 // Activity merges per-issue history into one feed. When Beads has no history
@@ -177,6 +182,18 @@ func (s *Service) Activity(ctx context.Context, req ActivityRequest) (*ActivityR
 		limit = 50
 	}
 
+	source := "history"
+	var journal []domain.Event
+	reaches, fromJournal := false, false
+	if req.IssueID == "" {
+		journal, reaches, fromJournal = s.journalActivity(ctx, cutoff) // lb-4gm.7
+	}
+	if fromJournal {
+		out := filterActivity(journal, cutoff, req)
+		if reaches || len(out) >= limit {
+			return finishActivity(out, limit, since, "journal"), nil
+		}
+	}
 	var events []domain.Event
 	if req.IssueID != "" {
 		ev, err := s.issueEvents(ctx, req.IssueID)
@@ -203,7 +220,11 @@ func (s *Service) Activity(ctx context.Context, req ActivityRequest) (*ActivityR
 			events = append(events, ev...)
 		}
 	}
+	return finishActivity(filterActivity(events, cutoff, req), limit, since, source), nil
+}
 
+// filterActivity applies the window, kind and actor filters.
+func filterActivity(events []domain.Event, cutoff time.Time, req ActivityRequest) []domain.Event {
 	kind := strings.ToLower(strings.TrimSpace(req.Type))
 	actor := strings.ToLower(strings.TrimSpace(req.Actor))
 	var out []domain.Event
@@ -220,10 +241,46 @@ func (s *Service) Activity(ctx context.Context, req ActivityRequest) (*ActivityR
 		out = append(out, ev)
 	}
 	sort.SliceStable(out, func(a, b int) bool { return out[a].Timestamp.After(out[b].Timestamp) })
+	return out
+}
+
+// finishActivity caps the newest-first feed.
+func finishActivity(out []domain.Event, limit int, since time.Duration, source string) *ActivityResult {
 	if len(out) > limit {
 		out = out[:limit]
 	}
-	return &ActivityResult{Events: out, Since: compactDuration(since)}, nil
+	return &ActivityResult{Events: out, Since: compactDuration(since), Source: source}
+}
+
+// activityWindow is how many recent journal records the feed reads.
+// lb-4gm.7
+const activityWindow = 500
+
+// journalActivity reads the feed from the events journal: one read instead
+// of `bd history` per issue. reaches says whether the records read go back
+// to cutoff; when they do not, Activity uses them only if they already fill
+// the feed (nothing older could make the cut), so a journal switched on
+// today, or a busy one under a narrow filter, falls back to bd history.
+// lb-4gm.7
+func (s *Service) journalActivity(ctx context.Context, cutoff time.Time) (events []domain.Event, reaches, ok bool) {
+	if !s.Client.Capabilities(ctx, s.Scope()).EventsJournal {
+		return nil, false, false
+	}
+	var head int64
+	if s.Mirror != nil && s.Mirror.Status().State == mirror.StateLive {
+		head = s.Mirror.Status().Checkpoint
+	}
+	recs, err := beads.JournalTail(ctx, s.Client, s.Scope(), activityWindow, head)
+	if err != nil || len(recs) == 0 {
+		return nil, false, false
+	}
+	events = make([]domain.Event, 0, len(recs))
+	for _, r := range recs {
+		events = append(events, r.Event())
+	}
+	// A pruned journal proves nothing: the pruned records may be inside
+	// the window. Only a record at or before the cutoff proves reach.
+	return events, !recs[0].TS.After(cutoff), true
 }
 
 func (s *Service) issueEvents(ctx context.Context, id string) ([]domain.Event, error) {

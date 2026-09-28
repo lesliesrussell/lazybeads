@@ -47,13 +47,31 @@ type MemClient struct {
 func (f *MemClient) AppendJournal(rec beads.JournalRecord) beads.JournalRecord {
 	f.journalMu.Lock()
 	defer f.journalMu.Unlock()
-	rec.Seq = int64(len(f.journal)) + 1
+	rec.Seq = 1
+	if n := len(f.journal); n > 0 {
+		rec.Seq = f.journal[n-1].Seq + 1
+	}
 	f.journal = append(f.journal, rec)
 	if f.journalCh != nil {
 		close(f.journalCh)
 		f.journalCh = nil
 	}
 	return rec
+}
+
+// PruneJournal drops records with seq up to and including through, as
+// `bd events prune` does.
+// lb-4gm.7
+func (f *MemClient) PruneJournal(through int64) {
+	f.journalMu.Lock()
+	defer f.journalMu.Unlock()
+	kept := f.journal[:0]
+	for _, r := range f.journal {
+		if r.Seq > through {
+			kept = append(kept, r)
+		}
+	}
+	f.journal = kept
 }
 
 // JournalRead returns records after since, up to limit (0 = all).
@@ -89,7 +107,7 @@ func (f *MemClient) JournalFollow(ctx context.Context, since int64, scope beads.
 			since = r.Seq
 		}
 		f.journalMu.Lock()
-		if int64(len(f.journal)) > since {
+		if n := len(f.journal); n > 0 && f.journal[n-1].Seq > since {
 			f.journalMu.Unlock()
 			continue
 		}

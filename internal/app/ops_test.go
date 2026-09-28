@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lesliesrussell/lazybeads/internal/beads"
 	"github.com/lesliesrussell/lazybeads/internal/config"
 	"github.com/lesliesrussell/lazybeads/internal/domain"
 )
@@ -240,5 +241,82 @@ func TestDoctorWithoutClientDoesNotInventSchemaFailure(t *testing.T) {
 				t.Errorf("%s reported as error without a workspace: %+v", name, c)
 			}
 		}
+	}
+}
+
+// lb-4gm.7
+func TestActivityReadsTheJournalWhenItCoversTheWindow(t *testing.T) {
+	f := newFakeClient()
+	f.Add(domain.Issue{ID: "lb-1", Title: "one", Status: domain.StatusOpen})
+	rec := func(op string, ago time.Duration) {
+		f.AppendJournal(beads.JournalRecord{Op: op, IssueID: "lb-1", Actor: "agent", TS: Now().Add(-ago),
+			Issue: &domain.Issue{ID: "lb-1", Title: "one", Status: domain.StatusOpen}})
+	}
+	rec(beads.JournalOpCreate, 30*time.Hour) // older than the 24h window
+	rec(beads.JournalOpUpdate, 2*time.Hour)
+	rec(beads.JournalOpClose, time.Hour)
+	svc := newTestService(f)
+	got, err := svc.Activity(context.Background(), ActivityRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Source != "journal" || len(got.Events) != 2 || got.Events[0].Kind != domain.EventClosed {
+		t.Fatalf("activity = %s %+v", got.Source, got.Events)
+	}
+	for _, c := range f.calls {
+		if strings.HasPrefix(c, "history") {
+			t.Errorf("the journal answered, yet bd history ran: %v", f.calls)
+		}
+	}
+}
+
+// lb-4gm.7
+func TestActivityFallsBackWhenTheJournalCannotCoverTheWindow(t *testing.T) {
+	young := newFakeClient()
+	young.Add(domain.Issue{ID: "lb-1", Title: "one", Status: domain.StatusOpen})
+	young.AppendJournal(beads.JournalRecord{Op: beads.JournalOpCreate, IssueID: "lb-1", TS: Now().Add(-time.Hour),
+		Issue: &domain.Issue{ID: "lb-1", Title: "one"}})
+	off := newFakeClient()
+	off.Add(domain.Issue{ID: "lb-1", Title: "one", Status: domain.StatusOpen})
+	off.JournalOff = true
+	// Records pruned by hand prove nothing about what the window held.
+	pruned := newFakeClient()
+	pruned.Add(domain.Issue{ID: "lb-1", Title: "one", Status: domain.StatusOpen})
+	for i := 0; i < 3; i++ {
+		pruned.AppendJournal(beads.JournalRecord{Op: beads.JournalOpUpdate, IssueID: "lb-1", TS: Now().Add(-time.Hour),
+			Issue: &domain.Issue{ID: "lb-1", Title: "one"}})
+	}
+	pruned.PruneJournal(2)
+	for name, f := range map[string]*MemClient{"switched on an hour ago": young, "off": off, "pruned today": pruned} {
+		got, err := newTestService(f).Activity(context.Background(), ActivityRequest{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Source != "history" {
+			t.Errorf("%s: source = %s", name, got.Source)
+		}
+	}
+}
+
+// lb-4gm.7
+func TestBusyJournalServesTheFeedOnlyWhenItFillsIt(t *testing.T) {
+	f := newFakeClient()
+	f.Add(domain.Issue{ID: "lb-1", Title: "one", Status: domain.StatusOpen})
+	// A rare actor acted early in the window; 600 later records push it
+	// out of the 500 the journal read covers.
+	f.AppendJournal(beads.JournalRecord{Op: beads.JournalOpUpdate, IssueID: "lb-1", Actor: "rare", TS: Now().Add(-3 * time.Hour),
+		Issue: &domain.Issue{ID: "lb-1", Title: "one"}})
+	for i := 0; i < 600; i++ {
+		f.AppendJournal(beads.JournalRecord{Op: beads.JournalOpUpdate, IssueID: "lb-1", Actor: "busy", TS: Now().Add(-time.Hour),
+			Issue: &domain.Issue{ID: "lb-1", Title: "one"}})
+	}
+	svc := newTestService(f)
+	all, err := svc.Activity(context.Background(), ActivityRequest{})
+	if err != nil || all.Source != "journal" || len(all.Events) != 50 {
+		t.Fatalf("unfiltered = %s %d %v", all.Source, len(all.Events), err)
+	}
+	rare, err := svc.Activity(context.Background(), ActivityRequest{Actor: "rare"})
+	if err != nil || rare.Source != "history" {
+		t.Errorf("a filter the 500 records cannot fill must fall back: %s %v", rare.Source, err)
 	}
 }

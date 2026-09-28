@@ -39,6 +39,13 @@ func (m Model) pollTick() tea.Cmd {
 	return tea.Tick(m.opts.PollEvery, func(time.Time) tea.Msg { return pollMsg{} })
 }
 
+// journalActivity is true when the activity feed on screen came from the
+// events journal: then redrawing it is one read, not a bd history per issue.
+// lb-4gm.7
+func (m Model) journalActivity() bool {
+	return m.view == viewActivity && m.activity != nil && m.activity.Source == "journal"
+}
+
 // liveView reports whether a view is built from reads the mirror answers.
 // Health, memory and activity run bd commands of their own, so records do
 // not redraw them; the header counts still update.
@@ -78,7 +85,7 @@ func (m Model) quietReload() (Model, tea.Cmd) {
 		}
 	}
 	cmds := []tea.Cmd{m.loadStatus()}
-	if liveView(m.view) {
+	if liveView(m.view) || m.journalActivity() {
 		cmds = append(cmds, m.loadView())
 	}
 	return m, tea.Batch(cmds...)
