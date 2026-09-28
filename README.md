@@ -4,7 +4,7 @@ The terminal operator console for [Beads](https://github.com/gastownhall/beads).
 
 ![The LazyBeads TUI: the Issues tab, with the selected bead previewed beside the list](screenshot.png)
 
-`bd` is the database, graph, and atomic coordination layer. `lb` is attention management: rank, explain, navigate, and mutate through `bd` only — never by writing `.beads/` itself.
+`bd` is the database, graph, and atomic coordination layer. `lb` is attention management: rank, explain, navigate, and mutate through Beads' own interfaces — the `bd` CLI, the events journal and the `bd serve` HTTP API — never by writing `.beads/` itself.
 
 ```sh
 make                 # bin/lb
@@ -52,6 +52,17 @@ On a real terminal, `lb` with no arguments launches the TUI. Otherwise it prints
 | UI | `tui` |
 
 Every essential TUI action has a CLI equivalent. Mutations prompt on a TTY; non-interactive use requires `--yes`. `--dry-run` prints the `bd` argv and executes nothing.
+
+## Live with Beads 1.3.0
+
+Turn on the Beads events journal and the TUI and `lb status --watch` update themselves as agents change beads — no refresh key, no polling:
+
+```sh
+bd config set events-journal true
+lb            # the header shows "● live"
+```
+
+LazyBeads keeps a local copy of the workspace fed by the journal, applying each change instead of re-running queries. In a workspace backed by a Dolt server it also starts and uses `bd serve`, Beads' HTTP API, for reads and writes. `lb doctor` shows what is in use; see [docs/architecture.md](docs/architecture.md).
 
 JSON output is a stable envelope (`schema_version`, `command`, `workspace`, `data`, `warnings`, `generated_at`).
 

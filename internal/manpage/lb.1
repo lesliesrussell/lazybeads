@@ -26,12 +26,19 @@ task, understand why that task is ready, and act on it without losing the
 audit trail.
 .PP
 .B lb
-never talks to a database directly. Every read and every mutation is a
-subprocess call to
+never talks to a database directly. Every read and every mutation goes
+through Beads' own interfaces: a subprocess call to
 .BR bd ,
-executed as an argument vector with no shell interpolation. Anything
-.B bd
-cannot do,
+executed as an argument vector with no shell interpolation, or, from Beads
+1.3.0, the
+.B bd serve
+HTTP API and the events journal (see
+.B [serve]
+under
+.B CONFIGURATION
+and
+.BR "INTERACTIVE INTERFACE" ).
+Anything Beads cannot do,
 .B lb
 does not do either.
 .PP

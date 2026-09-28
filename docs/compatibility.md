@@ -1,6 +1,17 @@
 # Compatibility
 
-LazyBeads talks to Beads only through the `bd` CLI. It never writes `.beads/` or the Dolt database.
+LazyBeads talks to Beads only through Beads' own interfaces: the `bd` CLI, and from Beads 1.3.0 the events journal and the `bd serve` HTTP API. It never writes `.beads/` or the Dolt database.
+
+## Beads 1.3.0 features
+
+| Feature | Needs | Without it |
+|---|---|---|
+| Live views (journal-fed mirror) | `bd events` and `bd config set events-journal true` | Views poll every `refresh_interval` |
+| HTTP transport (`bd serve`) | A Dolt server or proxied-server workspace | The `bd` CLI; embedded Dolt is refused by `bd serve` 1.3.0 |
+| HTTP writes | HTTP transport, an actor, and no bd event hooks (or `serve.http_writes = "always"`) | Writes use the `bd` CLI |
+| Journal-backed activity feed | A journal that covers the requested window | `bd history` per issue |
+
+Each Beads clone has its own journal sequence, and syncs (`bd dolt pull`) are not journaled, so the mirror is rebuilt on `R` and every five minutes.
 
 ## Version matrix
 
@@ -26,6 +37,7 @@ At startup the adapter records presence, not version strings alone:
 | Memory | `lb memory` degrades |
 | Reopen / unclaim | Those commands exit **6** |
 | Sync inspection (`bd dolt`) | `lb sync status` reports unknown; never invents “clean” |
+| Events journal (`bd events tail --follow`) | Views poll; the activity feed uses `bd history` |
 
 Missing capabilities return exit **6** with a hint. LazyBeads will not fall back to writing the Dolt database.
 
@@ -39,6 +51,8 @@ Missing capabilities return exit **6** with a hint. LazyBeads will not fall back
 - Actor, config, stale claims, cycles
 - Parent/status inconsistencies (open child of a closed parent, `in_progress` without an assignee)
 - Sync visibility
+- Transport: whether reads and writes go through `bd serve` or the `bd` CLI, and why
+- Events journal: whether it is on, and how to turn it on
 
 `lb doctor --fix` may write a user config file, create the cache directory, and install optional shell completion scripts. It never upgrades Beads, pushes or pulls Dolt, or changes issues.
 
