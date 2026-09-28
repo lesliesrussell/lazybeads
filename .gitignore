@@ -8,6 +8,8 @@
 # lb-eu1: derived export of the interactions table; Dolt (refs/dolt/data) is
 # the source of truth and bd rewrites this on ordinary use.
 .beads/interactions.jsonl
+# lb-at0: bd 1.3.0's runtime lock, created beside .beads/
+.beads.gate.lock
 .omc/state/
 .DS_Store
 
