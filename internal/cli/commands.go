@@ -239,6 +239,8 @@ func (rt *runtime) watch(cmd *cobra.Command, interval time.Duration, fn func(*co
 	}
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// lb-4gm.3
+	defer rt.svc.ConnectServe(ctx, true)()
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	if err := fn(cmd); err != nil {

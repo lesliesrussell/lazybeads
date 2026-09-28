@@ -831,6 +831,44 @@ Tables mapping an action name to an array of key strings, overriding the
 built-in bindings for that scope. Collisions are reported by
 .BR "lb doctor" .
 .
+.SS [serve]
+How LazyBeads reaches a Beads
+.B bd serve
+HTTP API. Reads go over HTTP when a server is available; anything the server
+cannot answer, and every read while it is unreachable, falls back to the
+.B bd
+CLI.
+.B url
+and
+.B token_file
+are read from the user configuration and the environment only; a project
+.I .lazybeads.toml
+cannot choose which server LazyBeads trusts or which file it sends as a
+credential.
+.TP
+.B url
+Address of a running
+.BR "bd serve" ,
+used by every command. It must be
+.B http
+on a loopback host, and the server must serve this workspace's Beads project.
+.TP
+.B token_file
+File holding the bearer token for a server started with
+.BR --auth-token-file .
+The token itself never goes in configuration or on a command line.
+.TP
+.B auto_start
+.BR auto " (default) or " never .
+With
+.BR auto ,
+the TUI and
+.B \-\-watch
+start a
+.B bd serve
+of their own for a workspace backed by a Dolt server, and stop it on exit.
+Embedded-Dolt workspaces always use the CLI.
+.
 .SS [aliases]
 A table of user-defined command aliases.
 .
@@ -904,6 +942,13 @@ Rig name.
 .TP
 .B LB_TIMEOUT
 Per-invocation timeout. An unparseable value is ignored rather than fatal.
+.TP
+.BR LB_SERVE_URL ", " LB_SERVE_TOKEN_FILE ", " LB_SERVE_AUTO_START
+Override
+.BR serve.url ,
+.B serve.token_file
+and
+.BR serve.auto_start .
 .TP
 .B LB_NO_CONFIRM
 Truthy

@@ -2,6 +2,8 @@
 package cli
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 
 	"github.com/lesliesrussell/lazybeads/internal/tui"
@@ -23,6 +25,8 @@ func (rt *runtime) tuiCmd() *cobra.Command {
 }
 
 func (rt *runtime) runTUI(view, issue string) error {
+	// lb-4gm.3
+	defer rt.svc.ConnectServe(context.Background(), true)()
 	return tui.Run(rt.svc, tui.Options{
 		ASCII: rt.ascii,
 		Color: rt.out != nil && rt.out.ColorEnabled(),

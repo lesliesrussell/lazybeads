@@ -26,6 +26,19 @@ type MemClient struct {
 	// BDVersion is what Version reports; empty means 1.0.5.
 	// lb-4gm.1
 	BDVersion string
+
+	// WorkspaceCtx is what WorkspaceContext reports (embedded by default).
+	// lb-4gm.3
+	WorkspaceCtx beads.WorkspaceContext
+}
+
+// WorkspaceContext reports the configured storage mode.
+// lb-4gm.3
+func (f *MemClient) WorkspaceContext(context.Context, beads.Scope) (beads.WorkspaceContext, error) {
+	if f.WorkspaceCtx.DoltMode == "" {
+		return beads.WorkspaceContext{DoltMode: "embedded"}, nil
+	}
+	return f.WorkspaceCtx, nil
 }
 
 type edge struct {

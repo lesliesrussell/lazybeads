@@ -271,6 +271,12 @@ func (rt *runtime) resolveWorkspace(ctx context.Context) error {
 		return err
 	}
 	rt.svc = app.NewService(client, cfg, ws, actor, workspace.NewInProcessLocks())
+	// A configured server serves one-shot commands too; only long-lived
+	// sessions start one of their own.
+	// lb-4gm.3
+	if cfg.Serve.URL != "" {
+		rt.svc.ConnectServe(ctx, false)
+	}
 	return nil
 }
 

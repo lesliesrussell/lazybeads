@@ -172,3 +172,73 @@ func TestDistinctScopesDoNotCollide(t *testing.T) {
 		t.Errorf("cross-scope reuse should be allowed, got %v", got)
 	}
 }
+
+// lb-4gm.3
+func TestServeSection(t *testing.T) {
+	cfg := Default()
+	if err := Validate(&cfg); err != nil || cfg.Serve.AutoStart != "auto" {
+		t.Fatalf("default auto_start = %q, %v", cfg.Serve.AutoStart, err)
+	}
+	for _, u := range []string{"http://127.0.0.1:7777", "http://localhost:7777", "http://[::1]:7777"} {
+		cfg = Default()
+		cfg.Serve.URL = u
+		if err := Validate(&cfg); err != nil {
+			t.Errorf("%s: %v", u, err)
+		}
+	}
+	for _, u := range []string{"http://10.1.2.3:7777", "http://beads.example.com", "https://127.0.0.1:7777", "127.0.0.1:7777"} {
+		cfg = Default()
+		cfg.Serve.URL = u
+		if err := Validate(&cfg); err == nil {
+			t.Errorf("serve.url %q must be rejected", u)
+		}
+	}
+	cfg = Default()
+	cfg.Serve.AutoStart = "sometimes"
+	if err := Validate(&cfg); err == nil {
+		t.Error("an unknown auto_start must be rejected")
+	}
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ProjectFileName), []byte("[serve]\nurl = \"http://127.0.0.1:7000\"\nauto_start = \"never\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("LB_CONFIG", filepath.Join(dir, "absent.toml"))
+	t.Setenv("LB_SERVE_URL", "http://127.0.0.1:7001")
+	t.Setenv("LB_SERVE_TOKEN_FILE", "/secrets/bd-token")
+	loaded, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Serve.URL != "http://127.0.0.1:7001" || loaded.Serve.AutoStart != "never" || loaded.Serve.TokenFile != "/secrets/bd-token" {
+		t.Errorf("serve = %+v", loaded.Serve)
+	}
+}
+
+// lb-4gm.3
+func TestProjectConfigCannotChooseServerOrCredential(t *testing.T) {
+	dir := t.TempDir()
+	user := filepath.Join(dir, "user.toml")
+	if err := os.WriteFile(user, []byte("[serve]\nurl = \"http://127.0.0.1:7000\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	project := filepath.Join(dir, "repo")
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(project, ProjectFileName), []byte(
+		"[serve]\nurl = \"http://127.0.0.1:6666\"\ntoken_file = \"~/.git-credentials\"\nauto_start = \"never\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("LB_CONFIG", user)
+	loaded, err := Load(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Serve.URL != "http://127.0.0.1:7000" || loaded.Serve.TokenFile != "" {
+		t.Errorf("project config chose serve url/token: %+v", loaded.Serve)
+	}
+	if loaded.Serve.AutoStart != "never" {
+		t.Error("a project may still opt out of starting a server")
+	}
+}

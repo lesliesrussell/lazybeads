@@ -25,6 +25,12 @@ type Service struct {
 	Actor     string
 	Locks     workspace.LockManager
 
+	// Transport reports whether reads go through the bd CLI or bd serve, and
+	// StartServe overrides how a server is launched.
+	// lb-4gm.3
+	Transport  Transport
+	StartServe ServeStarter
+
 	cache *cache
 }
 
@@ -39,6 +45,7 @@ func NewService(client beads.Client, cfg config.Config, ws workspace.Workspace, 
 		Workspace: ws,
 		Actor:     actor,
 		Locks:     locks,
+		Transport: Transport{Kind: "cli"}, // lb-4gm.3
 		cache:     newCache(5 * time.Second),
 	}
 }

@@ -10,6 +10,7 @@ type Config struct {
 	Ranking   Ranking           `toml:"ranking"`
 	TUI       TUI               `toml:"tui"`
 	Keys      Keys              `toml:"keys"`
+	Serve     Serve             `toml:"serve"` // lb-4gm.3
 	Aliases   map[string]string `toml:"aliases"`
 
 	// Sources records which files contributed, for `lb doctor`.
@@ -63,6 +64,19 @@ type TUI struct {
 	ReducedMotion    bool `toml:"reduced_motion"`
 }
 
+// Serve says how LazyBeads reaches a `bd serve` HTTP API.
+// lb-4gm.3
+type Serve struct {
+	// URL names a running server. It must be http on a loopback host.
+	URL string `toml:"url"`
+	// TokenFile holds the bearer token for a server started with
+	// --auth-token-file. The token itself never goes in configuration.
+	TokenFile string `toml:"token_file"`
+	// AutoStart is "auto" (start `bd serve` for the TUI and --watch when the
+	// workspace runs a Dolt server) or "never".
+	AutoStart string `toml:"auto_start"`
+}
+
 // Keys carries user keybinding overrides keyed by scope then action.
 type Keys struct {
 	Layout string              `toml:"layout"`
@@ -100,6 +114,7 @@ func Default() Config {
 			ShowDescriptions: true,
 		},
 		Keys:    Keys{Layout: "logical"},
+		Serve:   Serve{AutoStart: "auto"}, // lb-4gm.3
 		Aliases: map[string]string{},
 	}
 }

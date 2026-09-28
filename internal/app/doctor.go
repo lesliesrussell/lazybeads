@@ -122,7 +122,7 @@ func (s *Service) Doctor(ctx context.Context, req DoctorRequest) (*DoctorReport,
 					Name: "schema", Level: domain.HealthError,
 					Summary: "Beads schema is incompatible with this LazyBeads",
 					Detail:  err.Error(),
-					Hint:    "Upgrade bd and follow Beads' own migration; LazyBeads will not run bd migrate.",
+					Hint:    ce.UserHint(), // lb-4gm.3
 				})
 			} else {
 				h.Checks = append(h.Checks, domain.HealthCheck{
@@ -141,6 +141,7 @@ func (s *Service) Doctor(ctx context.Context, req DoctorRequest) (*DoctorReport,
 				Summary: "Beads schema is compatible (tested " + version.TestedBeads + ")",
 			})
 		}
+		h.Checks = append(h.Checks, s.transportCheck(ctx)) // lb-4gm.3
 	} else {
 		h.Checks = append(h.Checks, s.offlineBDChecks(ctx, report)...)
 	}
@@ -340,4 +341,40 @@ func applyDoctorFixes() ([]string, error) {
 	}
 	fixes = append(fixes, "cache directory "+cache)
 	return fixes, nil
+}
+
+// transportCheck reports how LazyBeads reaches Beads, and whether the TUI
+// would start a `bd serve` of its own.
+// lb-4gm.3
+func (s *Service) transportCheck(ctx context.Context) domain.HealthCheck {
+	check := domain.HealthCheck{Name: "transport", Level: domain.HealthInfo}
+	switch {
+	case s.Transport.Kind == "http":
+		check.Level = domain.HealthOK
+		check.Summary = "Reads go through bd serve at " + s.Transport.URL
+		return check
+	case s.Config.Serve.URL != "":
+		check.Level = domain.HealthWarning
+		check.Summary = "serve.url is set, but LazyBeads is using the bd CLI"
+		check.Detail = s.Transport.Note
+		check.Hint = "Start `bd serve` at that address, or remove serve.url."
+		return check
+	}
+	check.Summary = "One-shot commands use the bd CLI"
+	wcer, ok := s.Client.(workspaceContexter)
+	if !ok {
+		return check
+	}
+	wc, err := wcer.WorkspaceContext(ctx, s.Scope())
+	switch {
+	case err != nil:
+		check.Detail = "workspace mode unknown: " + err.Error()
+	case s.Config.Serve.AutoStart != "auto":
+		check.Detail = "serve.auto_start is never, so the TUI uses the bd CLI too"
+	case wc.ServesHTTP():
+		check.Detail = "The TUI and --watch start bd serve for this " + wc.DoltMode + " workspace"
+	default:
+		check.Detail = "bd serve needs a Dolt server; this workspace uses " + modeName(wc.DoltMode) + " Dolt, so the TUI uses the bd CLI too"
+	}
+	return check
 }

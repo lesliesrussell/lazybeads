@@ -3,6 +3,8 @@ package config
 
 import (
 	"fmt"
+	"net"
+	"net/url"
 	"sort"
 	"strings"
 )
@@ -49,6 +51,19 @@ func Validate(cfg *Config) error {
 	}
 	if cfg.Ranking.MaxGraphNodes <= 0 {
 		cfg.Ranking.MaxGraphNodes = 500
+	}
+
+	// lb-4gm.3
+	cfg.Serve.AutoStart = strings.ToLower(strings.TrimSpace(cfg.Serve.AutoStart))
+	switch cfg.Serve.AutoStart {
+	case "":
+		cfg.Serve.AutoStart = "auto"
+	case "auto", "never":
+	default:
+		return fmt.Errorf("serve.auto_start must be auto or never (got %q)", cfg.Serve.AutoStart)
+	}
+	if cfg.Serve.URL != "" && !loopbackHTTP(cfg.Serve.URL) {
+		return fmt.Errorf("serve.url must be an http URL on a loopback host (got %q)", cfg.Serve.URL)
 	}
 
 	switch strings.ToLower(cfg.Keys.Layout) {
@@ -116,4 +131,20 @@ func containsString(haystack []string, needle string) bool {
 		}
 	}
 	return false
+}
+
+// loopbackHTTP mirrors beads.IsLoopbackURL: a project config file must not be
+// able to point LazyBeads at another machine's server.
+// lb-4gm.3
+func loopbackHTTP(u string) bool {
+	parsed, err := url.Parse(u)
+	if err != nil || parsed.Scheme != "http" {
+		return false
+	}
+	host := parsed.Hostname()
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }

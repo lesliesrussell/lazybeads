@@ -26,6 +26,10 @@ type HTTPConfig struct {
 	// Token is sent as a bearer credential when the server requires one. It is
 	// never logged or included in errors.
 	Token string
+	// ProjectID, when set, is sent as Bd-Project-Id so a server for another
+	// workspace refuses the request instead of answering it.
+	// lb-4gm.3
+	ProjectID string
 	// HTTPClient overrides the transport; nil uses a client without a global
 	// timeout, since each call is bounded by its context.
 	HTTPClient *http.Client
@@ -68,9 +72,11 @@ type HTTP struct {
 	Client
 	base  *url.URL
 	token string
-	hc    *http.Client
-	info  ServerInfo
-	caps  map[string]bool
+	// lb-4gm.3
+	projectID string
+	hc        *http.Client
+	info      ServerInfo
+	caps      map[string]bool
 }
 
 // NewHTTP connects to a `bd serve` and reads what it supports. It fails with
@@ -89,7 +95,7 @@ func NewHTTP(ctx context.Context, cfg HTTPConfig, fallback Client) (*HTTP, error
 	if hc == nil {
 		hc = &http.Client{}
 	}
-	h := &HTTP{Client: fallback, base: base, token: cfg.Token, hc: hc, caps: map[string]bool{}}
+	h := &HTTP{Client: fallback, base: base, token: cfg.Token, projectID: cfg.ProjectID, hc: hc, caps: map[string]bool{}}
 	cctx, cancel := scoped(ctx, Scope{})
 	defer cancel()
 	body, err := h.get(cctx, "context", "/v0/beads/context", nil)
@@ -101,6 +107,11 @@ func NewHTTP(ctx context.Context, cfg HTTPConfig, fallback Client) (*HTTP, error
 	}
 	for _, c := range h.info.Capabilities {
 		h.caps[c] = true
+	}
+	// lb-4gm.3
+	if cfg.ProjectID != "" && h.info.ProjectID != cfg.ProjectID {
+		return nil, &CommandError{Kind: ErrWorkspaceNotFound, Operation: "connect to bd serve",
+			Cause: fmt.Errorf("the server at %s serves Beads project %s, not this workspace (%s)", h.base, h.info.ProjectID, cfg.ProjectID)}
 	}
 	return h, nil
 }
@@ -295,6 +306,10 @@ func (h *HTTP) do(ctx context.Context, op, method, path string, v url.Values, bo
 	}
 	if h.token != "" {
 		req.Header.Set("Authorization", "Bearer "+h.token)
+	}
+	// lb-4gm.3
+	if h.projectID != "" {
+		req.Header.Set("Bd-Project-Id", h.projectID)
 	}
 	resp, err := h.hc.Do(req)
 	if err != nil {

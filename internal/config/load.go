@@ -132,11 +132,18 @@ func Load(startDir string) (Config, error) {
 	}
 
 	if projectPath := FindProjectConfig(startDir); projectPath != "" {
+		// A cloned repository must not be able to choose which server
+		// LazyBeads trusts or which file it sends as a credential, so
+		// serve.url and serve.token_file come from user config and the
+		// environment only.
+		// lb-4gm.3
+		userServe := cfg.Serve
 		if applied, err := mergeFile(&cfg, projectPath); err != nil {
 			return cfg, err
 		} else if applied {
 			cfg.Sources = append(cfg.Sources, projectPath)
 		}
+		cfg.Serve.URL, cfg.Serve.TokenFile = userServe.URL, userServe.TokenFile
 	}
 
 	applyEnv(&cfg)
@@ -187,6 +194,16 @@ func applyEnv(cfg *Config) {
 		if d, err := ParseDuration(v); err == nil {
 			cfg.General.Timeout = Duration(d)
 		}
+	}
+	// lb-4gm.3
+	if v := os.Getenv("LB_SERVE_URL"); v != "" {
+		cfg.Serve.URL = v
+	}
+	if v := os.Getenv("LB_SERVE_TOKEN_FILE"); v != "" {
+		cfg.Serve.TokenFile = v
+	}
+	if v := os.Getenv("LB_SERVE_AUTO_START"); v != "" {
+		cfg.Serve.AutoStart = v
 	}
 	// LB_NO_CONFIRM is deliberately environment-only: project configuration must
 	// never be able to silently disable confirmation for a cloned repository.
