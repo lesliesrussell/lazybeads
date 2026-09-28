@@ -1,0 +1,9 @@
+{
+  "code": "invalid_argument",
+  "detail": "limit must be zero or greater; 0 means unlimited",
+  "param": "limit",
+  "reason": "invalid_value",
+  "request_id": "1419a336-000014",
+  "status": 400,
+  "title": "Bad Request"
+}

@@ -465,34 +465,7 @@ func (c *CLI) Stats(ctx context.Context, scope Scope) (Stats, error) {
 	if err != nil {
 		return Stats{}, err
 	}
-	var payload struct {
-		Summary struct {
-			Total      int `json:"total_issues"`
-			Open       int `json:"open_issues"`
-			InProgress int `json:"in_progress_issues"`
-			Blocked    int `json:"blocked_issues"`
-			Ready      int `json:"ready_issues"`
-			Closed     int `json:"closed_issues"`
-			Deferred   int `json:"deferred_issues"`
-		} `json:"summary"`
-	}
-	data := trimJSON(out)
-	if len(data) == 0 {
-		return Stats{}, nil
-	}
-	if err := json.Unmarshal(data, &payload); err != nil {
-		return Stats{}, decodeErr(err, data)
-	}
-	return Stats{
-		Total:      payload.Summary.Total,
-		Open:       payload.Summary.Open,
-		InProgress: payload.Summary.InProgress,
-		Blocked:    payload.Summary.Blocked,
-		Ready:      payload.Summary.Ready,
-		Closed:     payload.Summary.Closed,
-		Deferred:   payload.Summary.Deferred,
-		Available:  true,
-	}, nil
+	return decodeStats(out) // lb-4gm.2
 }
 
 // CreateArgs renders the argv for a create, so --dry-run and the confirmation

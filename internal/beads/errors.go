@@ -26,6 +26,10 @@ const (
 	ErrTimeout           ErrorKind = "timeout"
 	ErrCancelled         ErrorKind = "cancelled"
 	ErrDecode            ErrorKind = "invalid_bd_json"
+	// lb-4gm.2
+	ErrUnavailable      ErrorKind = "beads_unavailable"
+	ErrJournalDisabled  ErrorKind = "events_journal_disabled"
+	ErrJournalTruncated ErrorKind = "events_journal_truncated"
 )
 
 // CommandError carries the full upstream context for a failed bd invocation.
@@ -39,6 +43,9 @@ type CommandError struct {
 	Stderr    string
 	Cause     error
 	Hint      string
+	// Problem is the RFC 9457 body a `bd serve` failure carried, if any.
+	// lb-4gm.2
+	Problem *Problem
 }
 
 func (e *CommandError) Error() string {
@@ -150,6 +157,13 @@ func (e *CommandError) Message() string {
 		return "The command was cancelled."
 	case ErrDecode:
 		return "LazyBeads could not understand the JSON emitted by `bd`."
+	// lb-4gm.2
+	case ErrUnavailable:
+		return "The Beads server is not answering right now."
+	case ErrJournalDisabled:
+		return "The Beads events journal is turned off for this workspace."
+	case ErrJournalTruncated:
+		return "The Beads events journal no longer holds the records LazyBeads needs."
 	default:
 		return e.Error()
 	}
@@ -179,6 +193,13 @@ func (e *CommandError) UserHint() string {
 		return "Run with --debug to see the raw output, and check your `bd` version."
 	case ErrTimeout:
 		return "Increase --timeout, or check whether the Beads database is locked."
+	// lb-4gm.2
+	case ErrUnavailable:
+		return "Check that `bd serve` is running; LazyBeads falls back to the `bd` CLI for reads meanwhile."
+	case ErrJournalDisabled:
+		return "Turn it on with `bd config set events-journal true`, then restart any running `bd serve`."
+	case ErrJournalTruncated:
+		return "LazyBeads rebuilds its view from current state; no action is needed."
 	}
 	return ""
 }
@@ -186,13 +207,13 @@ func (e *CommandError) UserHint() string {
 // ExitCode maps an error onto the LazyBeads exit code table.
 func (e *CommandError) ExitCode2() int {
 	switch e.Kind {
-	case ErrBDBinaryMissing, ErrBDExecution:
+	case ErrBDBinaryMissing, ErrBDExecution, ErrUnavailable: // lb-4gm.2
 		return domain.ExitBDUnavailable
 	case ErrWorkspaceNotFound:
 		return domain.ExitWorkspace
 	case ErrSchemaMismatch:
 		return domain.ExitSchema
-	case ErrUnsupported:
+	case ErrUnsupported, ErrJournalDisabled: // lb-4gm.2
 		return domain.ExitCapability
 	case ErrConflict:
 		return domain.ExitMutationRejected
