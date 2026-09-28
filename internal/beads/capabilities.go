@@ -185,7 +185,7 @@ func splitVersion(v string) []int {
 // TestedVersionRange documents the upstream versions LazyBeads has fixtures for.
 const (
 	MinTestedVersion = "1.0.0"
-	MaxTestedVersion = "1.99.99"
+	MaxTestedVersion = "1.3.99" // lb-4gm.1
 )
 
 // VersionWithinTestedRange reports whether the installed bd is inside the range

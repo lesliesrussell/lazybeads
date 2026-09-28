@@ -54,7 +54,7 @@ func (s *Service) offlineBDChecks(ctx context.Context, report *DoctorReport) []d
 		hint := ""
 		if !supportedBD(v.Version) {
 			level = domain.HealthWarning
-			hint = "LazyBeads is tested against Beads 1.0.x; continue with capability gating."
+			hint = "LazyBeads is tested against Beads " + version.TestedBeads + "; continue with capability gating."
 		}
 		checks = append(checks, domain.HealthCheck{
 			Name: "bd_version", Level: level,
@@ -107,7 +107,7 @@ func (s *Service) Doctor(ctx context.Context, req DoctorRequest) (*DoctorReport,
 			hint := ""
 			if !supportedBD(v.Version) {
 				level = domain.HealthWarning
-				hint = "LazyBeads is tested against Beads 1.0.x; continue with capability gating."
+				hint = "LazyBeads is tested against Beads " + version.TestedBeads + "; continue with capability gating."
 			}
 			h.Checks = append(h.Checks, domain.HealthCheck{
 				Name: "bd_version", Level: level,
@@ -290,9 +290,9 @@ func (s *Service) checkParentStatus(ctx context.Context, h *domain.Health) {
 	})
 }
 
+// lb-4gm.1
 func supportedBD(v string) bool {
-	v = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(v)), "v")
-	return strings.HasPrefix(v, "1.0.") || v == "1.0" || v == "1"
+	return beads.VersionWithinTestedRange(v)
 }
 
 func truncate(s string, n int) string {

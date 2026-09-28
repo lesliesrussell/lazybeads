@@ -84,6 +84,30 @@ func TestDoctorWarnsWhenActorMissing(t *testing.T) {
 	}
 }
 
+// lb-4gm.1
+func TestDoctorBDVersionAgainstTestedRange(t *testing.T) {
+	for _, c := range []struct {
+		version string
+		want    domain.HealthLevel
+	}{
+		{"1.0.5", domain.HealthOK},
+		{"1.3.0", domain.HealthOK},
+		{"1.4.0", domain.HealthWarning},
+	} {
+		f := newFakeClient()
+		f.BDVersion = c.version
+		got, err := newTestService(f).Doctor(context.Background(), DoctorRequest{})
+		if err != nil {
+			t.Fatalf("Doctor: %v", err)
+		}
+		for _, check := range got.Health.Checks {
+			if check.Name == "bd_version" && check.Level != c.want {
+				t.Errorf("bd %s: level = %s, want %s (%s)", c.version, check.Level, c.want, check.Hint)
+			}
+		}
+	}
+}
+
 func TestDoctorFlagsOpenChildOfClosedParent(t *testing.T) {
 	// lb-uvj
 	f := newFakeClient()

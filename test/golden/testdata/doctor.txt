@@ -3,7 +3,7 @@ Health: - info
 
 + bd_version  Beads 1.0.5
 + json_parse  Beads JSON output decodes
-+ schema  Beads schema is compatible (tested 1.0.x)
++ schema  Beads schema is compatible (tested 1.0.x–1.3.x)
 + workspace  Workspace /fake
 + actor  Actor operator
 - config  Using built-in defaults (no config file)

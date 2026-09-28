@@ -7,6 +7,7 @@ LazyBeads talks to Beads only through the `bd` CLI. It never writes `.beads/` or
 | LazyBeads | Beads | Status |
 |---|---|---|
 | 0.1.x | 1.0.x | Tested. Fixtures under `internal/beads/testdata/bd-1.0.5/`. |
+| 0.1.x | 1.3.x | Tested. Fixtures under `internal/beads/testdata/bd-1.3.0/`. |
 | 0.1.x | other 1.x | Used through capability probing. `lb doctor` warns and continues. |
 | 0.1.x | 0.x / unknown | Error if `bd` cannot run or JSON cannot be parsed. Schema mismatch is exit **5**. |
 
@@ -30,9 +31,9 @@ Missing capabilities return exit **6** with a hint. LazyBeads will not fall back
 
 ## Doctor
 
-`lb doctor` warns when the installed `bd` is outside the 1.0.x range and continues. It also reports:
+`lb doctor` warns when the installed `bd` is outside the tested 1.0.x–1.3.x range and continues. It also reports:
 
-- Schema compatibility (error on mismatch; LazyBeads will not run `bd migrate`)
+- Schema compatibility (error on mismatch; LazyBeads will not run `bd migrate`). When a newer `bd` refuses to apply pending migrations to a remote-backed database, lb says so and points at `bd migrate --force && bd dolt push` on the one designated clone, or `bd bootstrap` on the others, instead of advising an upgrade.
 - JSON parse
 - Workspace discovery
 - Actor, config, stale claims, cycles

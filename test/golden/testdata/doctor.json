@@ -22,7 +22,7 @@
         {
           "name": "schema",
           "level": "ok",
-          "summary": "Beads schema is compatible (tested 1.0.x)"
+          "summary": "Beads schema is compatible (tested 1.0.x–1.3.x)"
         },
         {
           "name": "workspace",

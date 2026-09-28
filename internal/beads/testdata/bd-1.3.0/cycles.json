@@ -1,0 +1,17 @@
+[
+  {
+    "members": [
+      {"id": "fx-1w1", "issue": {"id": "fx-1w1", "title": "Beta bug", "status": "open", "priority": 2, "issue_type": "bug"}},
+      {"id": "fx-2ah", "issue": {"id": "fx-2ah", "title": "Alpha task", "status": "in_progress", "priority": 1, "issue_type": "task"}}
+    ],
+    "partial": false
+  },
+  {
+    "members": [
+      {"id": "fx-3aa"},
+      {"id": "fx-4bb", "issue": {"id": "fx-4bb", "title": "Resolved member", "status": "open", "priority": 2, "issue_type": "task"}},
+      {"id": "fx-5cc"}
+    ],
+    "partial": true
+  }
+]

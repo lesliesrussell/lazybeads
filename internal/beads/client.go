@@ -791,11 +791,17 @@ func (c *CLI) Cycles(ctx context.Context, scope Scope) ([][]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	return decodeCycles(out)
+}
+
+// decodeCycles accepts every shape bd has emitted for `dep cycles --json`.
+func decodeCycles(out []byte) ([][]string, error) {
 	data := trimJSON(out)
 	if len(data) == 0 {
 		return nil, nil
 	}
-	// bd emits either a list of ID lists or a list of objects carrying a path.
+	// Before 1.3.0 bd emitted either a list of ID lists or a list of objects
+	// carrying a path.
 	var direct [][]string
 	if err := json.Unmarshal(data, &direct); err == nil {
 		return direct, nil
@@ -804,6 +810,10 @@ func (c *CLI) Cycles(ctx context.Context, scope Scope) ([][]string, error) {
 		Cycle []string `json:"cycle"`
 		Path  []string `json:"path"`
 		IDs   []string `json:"ids"`
+		// lb-4gm.1
+		Members []struct {
+			ID string `json:"id"`
+		} `json:"members"`
 	}
 	if err := json.Unmarshal(data, &wrapped); err != nil {
 		return nil, decodeErr(err, data)
@@ -817,6 +827,15 @@ func (c *CLI) Cycles(ctx context.Context, scope Scope) ([][]string, error) {
 			out2 = append(out2, w.Path)
 		case len(w.IDs) > 0:
 			out2 = append(out2, w.IDs)
+		// lb-4gm.1
+		case len(w.Members) > 0:
+			ids := make([]string, 0, len(w.Members))
+			for _, m := range w.Members {
+				ids = append(ids, m.ID)
+			}
+			out2 = append(out2, ids)
+		default:
+			return nil, decodeErr(fmt.Errorf("unrecognised dependency cycle shape"), data)
 		}
 	}
 	return out2, nil

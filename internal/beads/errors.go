@@ -128,6 +128,10 @@ func (e *CommandError) Message() string {
 	case ErrWorkspaceNotFound:
 		return "No Beads workspace was found from this directory."
 	case ErrSchemaMismatch:
+		// lb-4gm.1
+		if migrationPending(e.Stderr) {
+			return "This Beads database has schema migrations that `bd` will not apply on its own."
+		}
 		return "Your `bd` binary cannot safely open this Beads database."
 	case ErrUnsupported:
 		return "This LazyBeads command requires a newer compatible Beads capability."
@@ -162,6 +166,10 @@ func (e *CommandError) UserHint() string {
 	case ErrWorkspaceNotFound:
 		return "Run `bd init` here, or pass --project/--beads-dir."
 	case ErrSchemaMismatch:
+		// lb-4gm.1
+		if migrationPending(e.Stderr) {
+			return "Only one clone of a shared remote may migrate: there run `bd migrate --force && bd dolt push`; on every other clone run `bd bootstrap`. LazyBeads will not migrate for you."
+		}
 		return "Upgrade `bd`, then follow its documented migration steps. LazyBeads will not migrate for you."
 	case ErrUnsupported:
 		return "Upgrade Beads to a version that provides this capability."
@@ -209,6 +217,13 @@ func AsCommandError(err error) (*CommandError, bool) {
 	return nil, false
 }
 
+// migrationPending reports whether bd refused to apply pending schema
+// migrations: the database is older than the binary, not newer.
+// lb-4gm.1
+func migrationPending(stderr string) bool {
+	return strings.Contains(strings.ToLower(stderr), "refusing to auto-apply")
+}
+
 // classifyStderr maps bd's diagnostic text onto the error taxonomy. bd exits
 // with 1 for most failures, so the text is the only available signal.
 func classifyStderr(stderr string, exitCode int, ctxErr error) ErrorKind {
@@ -217,6 +232,12 @@ func classifyStderr(stderr string, exitCode int, ctxErr error) ErrorKind {
 	}
 	if errors.Is(ctxErr, context.Canceled) {
 		return ErrCancelled
+	}
+	// bd warns about unapplied migrations before the query that then fails,
+	// so the warning outranks whatever error follows it.
+	// lb-4gm.1
+	if migrationPending(stderr) {
+		return ErrSchemaMismatch
 	}
 	// bd's --json failures arrive as an error envelope, so classify the
 	// message it carries rather than the surrounding braces. lb-2w3

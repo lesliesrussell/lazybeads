@@ -90,6 +90,13 @@ func TestCompareVersions(t *testing.T) {
 	if !VersionWithinTestedRange("1.0.5") {
 		t.Error("1.0.5 should be inside the tested range")
 	}
+	// lb-4gm.1
+	if !VersionWithinTestedRange("1.3.0") {
+		t.Error("1.3.0 should be inside the tested range")
+	}
+	if VersionWithinTestedRange("1.4.0") {
+		t.Error("1.4.0 has no fixtures and should be outside the tested range")
+	}
 	if VersionWithinTestedRange("2.5.0") {
 		t.Error("2.5.0 should be outside the tested range")
 	}

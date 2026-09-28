@@ -4,12 +4,19 @@ package beads
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
 
 func TestDecodeVersionedFixtures(t *testing.T) {
-	root := filepath.Join("testdata", "bd-1.0.5")
+	// lb-4gm.1
+	for _, version := range []string{"bd-1.0.5", "bd-1.3.0"} {
+		t.Run(version, func(t *testing.T) { decodeFixtureDir(t, filepath.Join("testdata", version)) })
+	}
+}
+
+func decodeFixtureDir(t *testing.T, root string) {
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		t.Fatal(err)
@@ -34,7 +41,7 @@ func TestDecodeVersionedFixtures(t *testing.T) {
 				if err != nil {
 					t.Fatalf("decodeIssues: %v", err)
 				}
-				if name == "ready-nonempty.json" && (len(issues) != 1 || issues[0].ID != "lb-1td") {
+				if name == "ready-nonempty.json" && (len(issues) != 1 || (issues[0].ID != "lb-1td" && issues[0].ID != "fx-2nl")) {
 					t.Fatalf("ready-nonempty = %+v", issues)
 				}
 			case strings.HasPrefix(name, "show-"):
@@ -104,4 +111,64 @@ func FuzzClaimArgs(f *testing.F) {
 			t.Fatalf("argv leaked a newline: %v", args)
 		}
 	})
+}
+
+// lb-4gm.1
+func TestDecodeCyclesAcrossVersions(t *testing.T) {
+	read := func(name string) []byte {
+		data, err := os.ReadFile(filepath.Join("testdata", "bd-1.3.0", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+	cycles, err := decodeCycles(read("cycles.json"))
+	if err != nil {
+		t.Fatalf("decodeCycles(1.3.0): %v", err)
+	}
+	want := [][]string{{"fx-1w1", "fx-2ah"}, {"fx-3aa", "fx-4bb", "fx-5cc"}}
+	if !reflect.DeepEqual(cycles, want) {
+		t.Fatalf("cycles = %v, want %v", cycles, want)
+	}
+	if cycles, err := decodeCycles(read("cycles-empty.json")); err != nil || len(cycles) != 0 {
+		t.Fatalf("empty cycles = %v, %v", cycles, err)
+	}
+	// Shapes emitted before 1.3.0 still decode.
+	for _, legacy := range []string{`[["a","b"]]`, `[{"cycle":["a","b"]}]`, `[{"path":["a","b"]}]`, `[{"ids":["a","b"]}]`} {
+		cycles, err := decodeCycles([]byte(legacy))
+		if err != nil || !reflect.DeepEqual(cycles, [][]string{{"a", "b"}}) {
+			t.Errorf("decodeCycles(%s) = %v, %v", legacy, cycles, err)
+		}
+	}
+	// An object shape lb does not know must fail loudly, not report "no cycles".
+	if _, err := decodeCycles([]byte(`[{"nodes":["a","b"]}]`)); err == nil {
+		t.Error("an unknown cycle shape must be a decode error")
+	}
+}
+
+// lb-4gm.1
+func TestPendingMigrationIsNotReportedAsOldBinary(t *testing.T) {
+	stderr, err := os.ReadFile(filepath.Join("testdata", "bd-1.3.0", "pending-migration.stderr"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kind := classifyStderr(string(stderr), 1, nil); kind != ErrSchemaMismatch {
+		t.Fatalf("kind = %q, want %q", kind, ErrSchemaMismatch)
+	}
+	ce := &CommandError{Kind: ErrSchemaMismatch, ExitCode: 1, Stderr: string(stderr)}
+	msg, hint := ce.Message(), ce.UserHint()
+	if !strings.Contains(msg, "migration") {
+		t.Errorf("message should name the pending migration: %q", msg)
+	}
+	if strings.Contains(hint, "Upgrade `bd`") || !strings.Contains(hint, "bd migrate") || !strings.Contains(hint, "bd bootstrap") {
+		t.Errorf("hint should point at migrate/bootstrap, not an upgrade: %q", hint)
+	}
+	if migrationPending("Checked schema: no pending schema migrations") {
+		t.Error("a no-op migration report is not a refusal")
+	}
+	// The plain "binary too old" case keeps its upgrade advice.
+	old := &CommandError{Kind: ErrSchemaMismatch, Stderr: "Error: schema version 3 is newer than this binary supports"}
+	if !strings.Contains(old.UserHint(), "Upgrade `bd`") {
+		t.Errorf("old-binary hint = %q", old.UserHint())
+	}
 }

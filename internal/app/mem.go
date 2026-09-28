@@ -22,6 +22,10 @@ type MemClient struct {
 
 	calls    []string
 	failShow map[string]error
+
+	// BDVersion is what Version reports; empty means 1.0.5.
+	// lb-4gm.1
+	BDVersion string
 }
 
 type edge struct {
@@ -135,6 +139,10 @@ func (f *MemClient) sortedIssues() []*domain.Issue {
 func (f *MemClient) record(op string) { f.calls = append(f.calls, op) }
 
 func (f *MemClient) Version(context.Context, beads.Scope) (beads.VersionInfo, error) {
+	// lb-4gm.1
+	if f.BDVersion != "" {
+		return beads.VersionInfo{Version: f.BDVersion}, nil
+	}
 	return beads.VersionInfo{Version: "1.0.5"}, nil
 }
 

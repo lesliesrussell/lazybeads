@@ -6,4 +6,4 @@ package version
 var Version = "0.1.0"
 
 // TestedBeads is the Beads series covered by fixtures and the compatibility matrix.
-const TestedBeads = "1.0.x"
+const TestedBeads = "1.0.x–1.3.x" // lb-4gm.1

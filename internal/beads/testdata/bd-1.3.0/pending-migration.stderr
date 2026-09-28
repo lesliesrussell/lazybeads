@@ -1,0 +1,11 @@
+Warning: refusing to auto-apply 17 pending schema migrations to a remote-backed database (v49 -> v66): migrating clones independently forks the schema (#4259)
+  Read-only command: continuing on schema v49 without migrating.
+  Writes are blocked until the schema is reconciled.  This is a
+  coordination decision, not an auto-fix - do NOT run a migration unless
+  you are the single designated migrator (only ONE clone may migrate a
+  shared remote, else the schema forks; #4259):
+    • designated migrator (only ONE machine): bd migrate --force && bd dolt push
+    • every other clone (another already migrated): bd bootstrap
+    • several machines: only ONE migrates; sync each other clone and run
+      bd dolt pull after the migrator pushes, before upgrading it
+Error: search count issues: Error 1146: table not found: leases
