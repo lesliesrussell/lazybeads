@@ -134,6 +134,7 @@ func (m Model) handleNavKey(k string) (tea.Model, tea.Cmd) {
 	case "R":
 		m.loading = true
 		m.err = nil
+		m.svc.Refresh() // lb-4gm.5
 		return m, tea.Batch(m.loadView(), m.loadStatus())
 	case "/":
 		m.overlay = overlayFilter
@@ -407,6 +408,7 @@ func (m Model) runPalette(cmd string) (tea.Model, tea.Cmd) {
 		return m.beginConfirm("claim")
 	case strings.HasPrefix(cmd, "refresh"):
 		m.loading = true
+		m.svc.Refresh() // lb-4gm.5
 		return m, tea.Batch(m.loadView(), m.loadStatus())
 	}
 	m.status = "unknown command: " + cmd

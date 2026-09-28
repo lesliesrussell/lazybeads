@@ -449,3 +449,15 @@ func scoped(ctx context.Context, scope Scope) (context.Context, context.CancelFu
 	}
 	return context.WithTimeout(ctx, timeout)
 }
+
+// WorkspaceContext forwards to the CLI, which knows how the workspace stores
+// its data.
+// lb-4gm.5
+func (h *HTTP) WorkspaceContext(ctx context.Context, scope Scope) (WorkspaceContext, error) {
+	if wc, ok := h.Client.(interface {
+		WorkspaceContext(context.Context, Scope) (WorkspaceContext, error)
+	}); ok {
+		return wc.WorkspaceContext(ctx, scope)
+	}
+	return WorkspaceContext{}, &CommandError{Kind: ErrUnsupported, Operation: "context"}
+}

@@ -9,6 +9,7 @@ import (
 	"github.com/lesliesrussell/lazybeads/internal/beads"
 	"github.com/lesliesrussell/lazybeads/internal/config"
 	"github.com/lesliesrussell/lazybeads/internal/domain"
+	"github.com/lesliesrussell/lazybeads/internal/mirror"
 	"github.com/lesliesrussell/lazybeads/internal/workspace"
 )
 
@@ -30,6 +31,10 @@ type Service struct {
 	// lb-4gm.3
 	Transport  Transport
 	StartServe ServeStarter
+
+	// Mirror is the journal-fed copy answering reads, when one is running.
+	// lb-4gm.5
+	Mirror *mirror.Mirror
 
 	cache *cache
 }
@@ -79,6 +84,7 @@ type cache struct {
 	mu      sync.Mutex
 	ttl     time.Duration
 	entries map[string]cacheEntry
+	gen     uint64 // lb-4gm.5
 }
 
 type cacheEntry struct {
@@ -119,6 +125,30 @@ func (c *cache) clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.entries = map[string]cacheEntry{}
+	c.gen++ // lb-4gm.5
+}
+
+// generation and putIf keep a read that started before a clear from caching
+// its now-stale answer after it.
+// lb-4gm.5
+func (c *cache) generation() uint64 {
+	if c == nil {
+		return 0
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.gen
+}
+
+func (c *cache) putIf(gen uint64, key string, value any) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.gen == gen {
+		c.entries[key] = cacheEntry{value: value, at: time.Now()}
+	}
 }
 
 // cachedIssues memoizes a read for the cache TTL.
@@ -128,10 +158,11 @@ func cachedIssues(ctx context.Context, s *Service, key string, fetch func() ([]d
 			return issues, nil
 		}
 	}
+	gen := s.cache.generation() // lb-4gm.5
 	issues, err := fetch()
 	if err != nil {
 		return nil, err
 	}
-	s.cache.put(key, issues)
+	s.cache.putIf(gen, key, issues)
 	return issues, nil
 }

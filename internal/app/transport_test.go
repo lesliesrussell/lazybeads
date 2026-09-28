@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/lesliesrussell/lazybeads/internal/beads"
 	"github.com/lesliesrussell/lazybeads/internal/domain"
@@ -191,4 +192,32 @@ func TestDoctorReportsJournalState(t *testing.T) {
 	if c := check(off); c.Level != domain.HealthInfo || !strings.Contains(c.Hint, "bd config set events-journal true") {
 		t.Errorf("off = %+v", c)
 	}
+}
+
+// lb-4gm.5
+func TestStartMirrorServesReadsAndStops(t *testing.T) {
+	f := newFakeClient()
+	f.Add(domain.Issue{ID: "lb-1", Title: "one", Status: domain.StatusOpen, Priority: 1})
+	svc := newTestService(f)
+	stop := svc.StartMirror(context.Background())
+	if svc.Mirror == nil || svc.Client != beads.Client(svc.Mirror) {
+		t.Fatal("the mirror must front the client")
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for svc.Mirror.Status().State != "live" {
+		if time.Now().After(deadline) {
+			t.Fatalf("mirror = %+v", svc.Mirror.Status())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	svc.Refresh()
+	stop()
+	if svc.Mirror != nil || svc.Client != beads.Client(f) {
+		t.Error("stopping the mirror must hand the original client back")
+	}
+	again := svc.StartMirror(context.Background())
+	if svc.Mirror == nil {
+		t.Error("a mirror can be started again after a stop")
+	}
+	again()
 }

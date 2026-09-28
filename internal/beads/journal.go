@@ -270,3 +270,33 @@ func (c *CLI) tail(ctx context.Context, since int64, limit int, follow bool, tim
 	}
 	return err
 }
+
+// headReader is implemented by clients that can report the journal head
+// without reading the journal.
+type headReader interface {
+	journalHead(ctx context.Context, scope Scope) (int64, error)
+}
+
+// JournalHead returns the highest seq the journal has assigned. Over bd serve
+// it is one request; over the CLI, which has no head query, a truncated read
+// reports it, and otherwise the retained journal is read to its end.
+func JournalHead(ctx context.Context, c Client, scope Scope) (int64, error) {
+	if hr, ok := c.(headReader); ok {
+		if head, err := hr.journalHead(ctx, scope); err == nil {
+			return head, nil
+		} else if !fallbackRead(err) {
+			return 0, err
+		}
+	}
+	recs, err := c.JournalRead(ctx, 0, 0, scope)
+	if err != nil {
+		if ce, ok := AsCommandError(err); ok && ce.Kind == ErrJournalTruncated && ce.Problem != nil {
+			return ce.Problem.Head, nil
+		}
+		return 0, err
+	}
+	if len(recs) == 0 {
+		return 0, nil
+	}
+	return recs[len(recs)-1].Seq, nil
+}

@@ -241,6 +241,7 @@ func (rt *runtime) watch(cmd *cobra.Command, interval time.Duration, fn func(*co
 	defer stop()
 	// lb-4gm.3
 	defer rt.svc.ConnectServe(ctx, true)()
+	defer rt.svc.StartMirror(ctx)() // lb-4gm.5
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	if err := fn(cmd); err != nil {

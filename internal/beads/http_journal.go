@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -288,4 +289,15 @@ func readSSE(r io.Reader, fn func(sseEvent) error, retry *time.Duration) error {
 		return &CommandError{Kind: ErrDecode, Operation: "events watch", Cause: sc.Err()}
 	}
 	return nil
+}
+
+// journalHead asks bd serve for the head without reading any record.
+func (h *HTTP) journalHead(ctx context.Context, scope Scope) (int64, error) {
+	if !h.Supports("events.list") {
+		return 0, &CommandError{Kind: ErrUnavailable, Operation: "events"}
+	}
+	rctx, cancel := scoped(ctx, scope)
+	defer cancel()
+	_, head, err := h.eventsPage(rctx, math.MaxInt64>>1, 1)
+	return head, err
 }
