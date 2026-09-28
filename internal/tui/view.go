@@ -94,8 +94,12 @@ func (m Model) headerLine() string {
 		blocked = fmt.Sprintf("%d", m.counts.Counts.Blocked)
 		health = string(m.counts.Health.Status)
 	}
-	return fmt.Sprintf(" lb  %s   ready %s   in-progress %s   blocked %s   health %s ",
+	line := fmt.Sprintf(" lb  %s   ready %s   in-progress %s   blocked %s   health %s ",
 		output.SanitizeLine(name), ready, active, blocked, health)
+	if badge := m.liveBadge(); badge != "" { // lb-4gm.6
+		line += "  " + badge + " "
+	}
+	return line
 }
 
 func (m Model) renderTabs(th theme) string {

@@ -247,14 +247,28 @@ func (rt *runtime) watch(cmd *cobra.Command, interval time.Duration, fn func(*co
 	if err := fn(cmd); err != nil {
 		return err
 	}
+	// lb-4gm.6: with the events journal driving the mirror, redraw when
+	// records land (a burst is one redraw); otherwise keep the interval, and
+	// drop cached reads so each tick really asks again.
+	changes := rt.svc.Changes()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
-			if err := fn(cmd); err != nil {
-				return err
+			if rt.svc.LiveMode().Kind == "live" {
+				continue
 			}
+			rt.svc.InvalidateCache()
+		case <-changes:
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(200 * time.Millisecond):
+			}
+		}
+		if err := fn(cmd); err != nil {
+			return err
 		}
 	}
 }

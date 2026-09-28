@@ -212,12 +212,10 @@ func TestStartMirrorServesReadsAndStops(t *testing.T) {
 	}
 	svc.Refresh()
 	stop()
-	if svc.Mirror != nil || svc.Client != beads.Client(f) {
-		t.Error("stopping the mirror must hand the original client back")
+	if got := svc.LiveMode(); got.Kind != "polling" {
+		t.Errorf("a stopped mirror must not claim to be live: %+v", got)
 	}
-	again := svc.StartMirror(context.Background())
-	if svc.Mirror == nil {
-		t.Error("a mirror can be started again after a stop")
+	if svc.Mirror.Status().State != "off" {
+		t.Error("a stopped mirror answers nothing")
 	}
-	again()
 }

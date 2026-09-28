@@ -35,6 +35,8 @@ type Service struct {
 	// Mirror is the journal-fed copy answering reads, when one is running.
 	// lb-4gm.5
 	Mirror *mirror.Mirror
+	// changes is signalled when the mirror moves. lb-4gm.6
+	changes chan struct{}
 
 	cache *cache
 }

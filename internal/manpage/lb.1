@@ -164,9 +164,12 @@ counts, the resolved workspace and actor, and any health checks that are not
 .RS
 .TP
 .BI \-\-watch " duration"
-Re-render on an interval, for example
+Keep the overview current until interrupted. When the workspace's Beads
+events journal is on, it redraws as changes are committed; otherwise it
+re-renders every
+.IR duration ,
+for example
 .BR 5s .
-Runs until interrupted.
 .RE
 .TP
 .B lb ready
@@ -722,7 +725,7 @@ Default
 Must be positive.
 .TP
 .B refresh_interval
-TUI auto-refresh interval. Default
+How often the TUI refreshes when no events journal drives it. Default
 .BR 30s .
 Must be positive.
 .TP
@@ -1140,6 +1143,21 @@ Beads is sanitised of control sequences before being written to the terminal.
 on a terminal) opens a tiled console: a stats header, context tabs, a list
 panel beside a live preview, and a keybinding bar. Below roughly 100 columns
 the preview pane hides itself.
+.PP
+When the workspace's Beads events journal is on
+.RB ( "bd config set events-journal true" ),
+LazyBeads keeps a local copy of the workspace fed by the journal and redraws
+the ready, focus, blocked, issues, detail and graph views as agents change
+beads, keeping the cursor on the selected issue. The header shows
+.B live
+(or
+.B syncing
+while the copy is built, with
+.B via bd serve
+when the HTTP API is in use). Without the journal it shows
+.B polling
+and refreshes every
+.BR general.refresh_interval .
 .
 .SS Keys
 .TP
@@ -1186,7 +1204,11 @@ open, in_progress, blocked, deferred, closed, and back to all.
 Command palette.
 .TP
 .B R
-Refresh.
+Refresh: re-read the workspace from scratch (needed only after a
+.B bd dolt pull
+or
+.B bd sql
+change, which the journal does not record).
 .TP
 .B ?
 Help overlay.

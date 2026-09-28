@@ -33,5 +33,7 @@ func (rt *runtime) runTUI(view, issue string) error {
 		Color: rt.out != nil && rt.out.ColorEnabled(),
 		View:  view,
 		Issue: issue,
+		// lb-4gm.6
+		PollEvery: rt.cfg.General.RefreshInterval.Duration(),
 	}, rt.opts.Stdin, rt.opts.Stdout)
 }

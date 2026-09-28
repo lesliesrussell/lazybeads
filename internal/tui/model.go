@@ -49,6 +49,10 @@ type Options struct {
 	Issue  string
 	Width  int
 	Height int
+	// PollEvery refreshes views on a timer when no events journal drives
+	// them; zero disables it.
+	// lb-4gm.6
+	PollEvery time.Duration
 }
 
 // Model is the Bubble Tea program. Every read and write goes through Service.
@@ -91,6 +95,9 @@ type Model struct {
 	lastRefresh time.Time
 	pane        int // 0 list, 1 preview — lazygit-style focused panel
 	scroll      int // lb-aio: vertical offset of the focused content pane
+	// lb-4gm.6: a live redraw is scheduled, and the row to keep selected.
+	refreshPending bool
+	keepID         string
 }
 
 type listRow struct {
@@ -154,7 +161,7 @@ func New(svc *app.Service, opts Options) Model {
 
 // Init loads the current view and the header counts.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.loadView(), m.loadStatus())
+	return tea.Batch(m.loadView(), m.loadStatus(), m.waitChange(), m.pollTick()) // lb-4gm.6
 }
 
 func (m Model) loadView() tea.Cmd {
@@ -248,13 +255,22 @@ func (m Model) loadStatus() tea.Cmd {
 // Update is the Bubble Tea event loop. Overlays steal keys; mutations always
 // confirm before calling Service.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// lb-4gm.6
+	if next, cmd, ok := m.updateLive(msg); ok {
+		return next, cmd
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		return m, nil
 	case tea.KeyMsg:
+		// lb-4gm.6: the user's own navigation wins over a pending live reload.
+		m.keepID = ""
 		return m.handleKey(msg)
 	case readyMsg:
+		if !m.accepts(viewReady) { // lb-4gm.6
+			return m, nil
+		}
 		m.loading = false
 		m.ready = msg.res
 		m.rows = readyRows(msg.res, m.filter)
@@ -262,18 +278,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.lastRefresh = app.Now()
 		return m, m.previewCmd()
 	case focusMsg:
+		if !m.accepts(viewFocus) { // lb-4gm.6
+			return m, nil
+		}
 		m.loading = false
 		m.focus = msg.res
 		m.rows = focusRows(msg.res, m.filter)
 		m.clampCursor()
 		return m, m.previewCmd()
 	case blockedMsg:
+		if !m.accepts(viewBlocked) { // lb-4gm.6
+			return m, nil
+		}
 		m.loading = false
 		m.blocked = msg.res
 		m.rows = blockedRows(msg.res, m.filter)
 		m.clampCursor()
 		return m, m.previewCmd()
 	case issuesMsg:
+		if !m.accepts(viewIssues) { // lb-4gm.6
+			return m, nil
+		}
 		m.loading = false
 		m.issues = msg.issues
 		m.rows = issueRows(msg.issues, m.filter)
@@ -313,6 +338,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(m.loadView(), m.loadStatus())
 	case errMsg:
+		m.keepID = "" // lb-4gm.6
 		m.loading = false
 		m.err = msg.err
 		m.status = msg.err.Error()
@@ -321,6 +347,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) clampCursor() {
+	// lb-4gm.6: after a live reload, stay on the issue that was selected.
+	if m.keepID != "" {
+		for i, r := range m.visibleRows() {
+			if r.ID == m.keepID {
+				m.cursor = i
+				break
+			}
+		}
+		m.keepID = ""
+	}
 	if m.cursor < 0 {
 		m.cursor = 0
 	}
