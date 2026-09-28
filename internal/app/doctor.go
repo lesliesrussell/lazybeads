@@ -354,6 +354,13 @@ func (s *Service) transportCheck(ctx context.Context) domain.HealthCheck {
 	case s.Transport.Kind == "http":
 		check.Level = domain.HealthOK
 		check.Summary = "Reads go through bd serve at " + s.Transport.URL
+		// lb-4gm.8
+		if s.Transport.Writes {
+			check.Summary = "Reads and writes go through bd serve at " + s.Transport.URL
+			check.Detail = "bd event hooks do not run for these writes; set serve.http_writes = \"never\" if you add any"
+		} else {
+			check.Detail = "Writes use the bd CLI: " + s.Transport.WritesNote
+		}
 		return check
 	case s.Config.Serve.URL != "":
 		check.Level = domain.HealthWarning

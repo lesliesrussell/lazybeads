@@ -144,6 +144,12 @@ func Load(startDir string) (Config, error) {
 			cfg.Sources = append(cfg.Sources, projectPath)
 		}
 		cfg.Serve.URL, cfg.Serve.TokenFile = userServe.URL, userServe.TokenFile
+		// Nor may it switch off the safety that keeps bd's event hooks
+		// running: a project can only turn HTTP writes off.
+		// lb-4gm.8
+		if !strings.EqualFold(strings.TrimSpace(cfg.Serve.HTTPWrites), "never") {
+			cfg.Serve.HTTPWrites = userServe.HTTPWrites
+		}
 	}
 
 	applyEnv(&cfg)
@@ -204,6 +210,9 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("LB_SERVE_AUTO_START"); v != "" {
 		cfg.Serve.AutoStart = v
+	}
+	if v := os.Getenv("LB_SERVE_HTTP_WRITES"); v != "" { // lb-4gm.8
+		cfg.Serve.HTTPWrites = v
 	}
 	// LB_NO_CONFIRM is deliberately environment-only: project configuration must
 	// never be able to silently disable confirmation for a cloned repository.

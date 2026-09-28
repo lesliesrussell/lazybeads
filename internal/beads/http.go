@@ -31,6 +31,11 @@ type HTTPConfig struct {
 	// workspace refuses the request instead of answering it.
 	// lb-4gm.3
 	ProjectID string
+	// Actor attributes writes; AllowWrites lets mutations go over HTTP at
+	// all (bd serve does not run bd's event hooks for them).
+	// lb-4gm.8
+	Actor       string
+	AllowWrites bool
 	// HTTPClient overrides the transport; nil uses a client without a global
 	// timeout, since each call is bounded by its context.
 	HTTPClient *http.Client
@@ -79,6 +84,10 @@ type HTTP struct {
 	info      ServerInfo
 	caps      map[string]bool
 
+	// lb-4gm.8
+	actor       string
+	allowWrites bool
+
 	// PollInterval paces journal polling when events:watch is refused.
 	// lb-4gm.4
 	PollInterval time.Duration
@@ -100,7 +109,8 @@ func NewHTTP(ctx context.Context, cfg HTTPConfig, fallback Client) (*HTTP, error
 	if hc == nil {
 		hc = &http.Client{}
 	}
-	h := &HTTP{Client: fallback, base: base, token: cfg.Token, projectID: cfg.ProjectID, hc: hc, caps: map[string]bool{}}
+	h := &HTTP{Client: fallback, base: base, token: cfg.Token, projectID: cfg.ProjectID, hc: hc, caps: map[string]bool{},
+		actor: cfg.Actor, allowWrites: cfg.AllowWrites}
 	cctx, cancel := scoped(ctx, Scope{})
 	defer cancel()
 	body, err := h.get(cctx, "context", "/v0/beads/context", nil)

@@ -4,6 +4,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/lesliesrussell/lazybeads/internal/beads"
 )
@@ -18,6 +19,11 @@ type Transport struct {
 	Spawned bool `json:"spawned,omitempty"`
 	// Note explains why the CLI is in use when HTTP was configured or possible.
 	Note string `json:"note,omitempty"`
+	// Writes is true when mutations go over HTTP too; WritesNote says why
+	// they do not.
+	// lb-4gm.8
+	Writes     bool   `json:"writes,omitempty"`
+	WritesNote string `json:"writes_note,omitempty"`
 }
 
 // ServeStarter launches a `bd serve` for scope. Tests replace it.
@@ -86,14 +92,16 @@ func (s *Service) ConnectServe(ctx context.Context, autoStart bool) func() {
 		url, stop, spawned = p.URL, p.Stop, true
 	}
 
-	h, err := beads.NewHTTP(ctx, beads.HTTPConfig{BaseURL: url, Token: token, ProjectID: wc.ProjectID}, s.Client)
+	writes, writesNote := s.httpWrites()
+	h, err := beads.NewHTTP(ctx, beads.HTTPConfig{BaseURL: url, Token: token, ProjectID: wc.ProjectID,
+		Actor: s.Actor, AllowWrites: writes}, s.Client)
 	if err != nil {
 		stop()
 		s.Transport.Note = fmt.Sprintf("bd serve at %s: %s", url, errText(err))
 		return noop
 	}
 	s.Client = h
-	s.Transport = Transport{Kind: "http", URL: url, Spawned: spawned}
+	s.Transport = Transport{Kind: "http", URL: url, Spawned: spawned, Writes: writes, WritesNote: writesNote}
 	s.InvalidateCache()
 	return stop
 }
@@ -110,4 +118,24 @@ func errText(err error) string {
 		return ce.Error()
 	}
 	return err.Error()
+}
+
+// httpWrites decides whether mutations go through bd serve. bd serve does
+// not run bd's event hooks (on_create, on_update, on_close), so "auto" keeps
+// writes on the CLI in a workspace that has any.
+// lb-4gm.8
+func (s *Service) httpWrites() (bool, string) {
+	switch s.Config.Serve.HTTPWrites {
+	case "never":
+		return false, "serve.http_writes is never"
+	case "always":
+		return true, ""
+	}
+	if s.Actor == "" {
+		return false, "no actor is configured to attribute HTTP writes to"
+	}
+	if hooks := beads.EventHooks(s.Workspace.BeadsDir); len(hooks) > 0 {
+		return false, "the workspace has bd event hooks (" + strings.Join(hooks, ", ") + "), which HTTP writes would skip"
+	}
+	return true, ""
 }

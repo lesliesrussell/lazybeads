@@ -871,6 +871,22 @@ start a
 .B bd serve
 of their own for a workspace backed by a Dolt server, and stop it on exit.
 Embedded-Dolt workspaces always use the CLI.
+.TP
+.B http_writes
+.BR auto " (default), " always " or " never .
+Whether claims, closes, reopens, updates, creates and dependency changes go
+through
+.B bd serve
+too. Beads does not run its event hooks
+.RB ( on_create ", " on_update ", " on_close
+in
+.IR .beads/hooks )
+for HTTP writes, so
+.B auto
+keeps writes on the
+.B bd
+CLI in a workspace that has any, or when no actor is configured. A write
+that may have reached the server is never repeated through the CLI.
 .
 .SS [aliases]
 A table of user-defined command aliases.
@@ -946,12 +962,13 @@ Rig name.
 .B LB_TIMEOUT
 Per-invocation timeout. An unparseable value is ignored rather than fatal.
 .TP
-.BR LB_SERVE_URL ", " LB_SERVE_TOKEN_FILE ", " LB_SERVE_AUTO_START
+.BR LB_SERVE_URL ", " LB_SERVE_TOKEN_FILE ", " LB_SERVE_AUTO_START ", " LB_SERVE_HTTP_WRITES
 Override
 .BR serve.url ,
-.B serve.token_file
+.BR serve.token_file ,
+.B serve.auto_start
 and
-.BR serve.auto_start .
+.BR serve.http_writes .
 .TP
 .B LB_NO_CONFIRM
 Truthy

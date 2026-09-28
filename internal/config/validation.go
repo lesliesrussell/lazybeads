@@ -62,6 +62,15 @@ func Validate(cfg *Config) error {
 	default:
 		return fmt.Errorf("serve.auto_start must be auto or never (got %q)", cfg.Serve.AutoStart)
 	}
+	// lb-4gm.8
+	cfg.Serve.HTTPWrites = strings.ToLower(strings.TrimSpace(cfg.Serve.HTTPWrites))
+	switch cfg.Serve.HTTPWrites {
+	case "":
+		cfg.Serve.HTTPWrites = "auto"
+	case "auto", "always", "never":
+	default:
+		return fmt.Errorf("serve.http_writes must be auto, always or never (got %q)", cfg.Serve.HTTPWrites)
+	}
 	if cfg.Serve.URL != "" && !loopbackHTTP(cfg.Serve.URL) {
 		return fmt.Errorf("serve.url must be an http URL on a loopback host (got %q)", cfg.Serve.URL)
 	}

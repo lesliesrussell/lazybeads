@@ -75,6 +75,11 @@ type Serve struct {
 	// AutoStart is "auto" (start `bd serve` for the TUI and --watch when the
 	// workspace runs a Dolt server) or "never".
 	AutoStart string `toml:"auto_start"`
+	// HTTPWrites is "auto" (send mutations through bd serve unless the
+	// workspace has bd event hooks, which HTTP writes skip), "always" or
+	// "never".
+	// lb-4gm.8
+	HTTPWrites string `toml:"http_writes"`
 }
 
 // Keys carries user keybinding overrides keyed by scope then action.
@@ -114,7 +119,7 @@ func Default() Config {
 			ShowDescriptions: true,
 		},
 		Keys:    Keys{Layout: "logical"},
-		Serve:   Serve{AutoStart: "auto"}, // lb-4gm.3
+		Serve:   Serve{AutoStart: "auto", HTTPWrites: "auto"}, // lb-4gm.3, lb-4gm.8
 		Aliases: map[string]string{},
 	}
 }

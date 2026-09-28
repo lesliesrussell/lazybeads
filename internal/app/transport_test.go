@@ -219,3 +219,31 @@ func TestStartMirrorServesReadsAndStops(t *testing.T) {
 		t.Error("a stopped mirror answers nothing")
 	}
 }
+
+// lb-4gm.8
+func TestHTTPWritesPolicy(t *testing.T) {
+	svc := newTestService(serverWorkspace())
+	svc.Workspace.BeadsDir = t.TempDir()
+	if ok, _ := svc.httpWrites(); !ok {
+		t.Error("auto sends writes over HTTP when there are no event hooks")
+	}
+	if err := os.MkdirAll(filepath.Join(svc.Workspace.BeadsDir, "hooks"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(svc.Workspace.BeadsDir, "hooks", "on_close"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if ok, why := svc.httpWrites(); ok || !strings.Contains(why, "on_close") {
+		t.Errorf("auto with hooks = %v %q", ok, why)
+	}
+	svc.Config.Serve.HTTPWrites = "always"
+	if ok, _ := svc.httpWrites(); !ok {
+		t.Error("always overrides the hook check")
+	}
+	svc.Config.Serve.HTTPWrites = "auto"
+	svc.Actor = ""
+	os.Remove(filepath.Join(svc.Workspace.BeadsDir, "hooks", "on_close"))
+	if ok, _ := svc.httpWrites(); ok {
+		t.Error("writes need an actor to attribute them to")
+	}
+}

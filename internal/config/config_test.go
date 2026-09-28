@@ -193,6 +193,15 @@ func TestServeSection(t *testing.T) {
 			t.Errorf("serve.url %q must be rejected", u)
 		}
 	}
+	// lb-4gm.8
+	cfg = Default()
+	if err := Validate(&cfg); err != nil || cfg.Serve.HTTPWrites != "auto" {
+		t.Errorf("default http_writes = %q, %v", cfg.Serve.HTTPWrites, err)
+	}
+	cfg.Serve.HTTPWrites = "sometimes"
+	if err := Validate(&cfg); err == nil {
+		t.Error("an unknown http_writes must be rejected")
+	}
 	cfg = Default()
 	cfg.Serve.AutoStart = "sometimes"
 	if err := Validate(&cfg); err == nil {
@@ -240,5 +249,20 @@ func TestProjectConfigCannotChooseServerOrCredential(t *testing.T) {
 	}
 	if loaded.Serve.AutoStart != "never" {
 		t.Error("a project may still opt out of starting a server")
+	}
+
+	// lb-4gm.8: a project cannot force HTTP writes past the hook check, but
+	// it may turn them off.
+	for value, want := range map[string]string{"always": "auto", "never": "never"} {
+		if err := os.WriteFile(filepath.Join(project, ProjectFileName), []byte("[serve]\nhttp_writes = \""+value+"\"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		loaded, err := Load(project)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if loaded.Serve.HTTPWrites != want {
+			t.Errorf("project http_writes=%s gave %s, want %s", value, loaded.Serve.HTTPWrites, want)
+		}
 	}
 }

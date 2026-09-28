@@ -46,6 +46,7 @@ ascii = false
 # url = "http://127.0.0.1:7777"   # a running `bd serve`; loopback only
 # token_file = "~/.config/beads/serve-token"
 auto_start = "auto"               # TUI and --watch start bd serve on Dolt-server workspaces
+http_writes = "auto"              # writes over HTTP unless .beads/hooks has on_create/on_update/on_close
 ```
 
 Environment:
@@ -53,7 +54,7 @@ Environment:
 ```
 LB_BD_BIN  LB_CONFIG  LB_PROJECT  LB_BEADS_DIR  LB_RIG
 LB_ACTOR   LB_COLOR   LB_TIMEOUT  LB_NO_CONFIRM  LB_LOG_LEVEL
-LB_SERVE_URL  LB_SERVE_TOKEN_FILE  LB_SERVE_AUTO_START
+LB_SERVE_URL  LB_SERVE_TOKEN_FILE  LB_SERVE_AUTO_START  LB_SERVE_HTTP_WRITES
 ```
 
 With a `bd serve` available, reads go over its HTTP API and fall back to the `bd` CLI for anything the server cannot answer. `serve.url` and `serve.token_file` are honoured only from user config and the environment, never from a project `.lazybeads.toml`. `serve.url` must be on a loopback host and must serve this workspace's Beads project; `lb doctor` reports which transport is in use and why. `bd serve` needs a Dolt server workspace, so embedded-Dolt workspaces always use the CLI.
